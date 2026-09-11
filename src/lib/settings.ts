@@ -13,8 +13,8 @@ const DEFAULT_SETTINGS_ROWS = [
   { key: "TG_BTN_RECEIVE_STATUS", value: "รับเรื่องแล้ว", description: "ค่าสถานะเมื่อกดปุ่มรับเรื่องแล้ว" },
   { key: "TG_BTN_PENDING_TEXT", value: "⏳ รอพิจารณา", description: "ข้อความปุ่ม Telegram: รอพิจารณา" },
   { key: "TG_BTN_PENDING_STATUS", value: "รอพิจารณา", description: "ค่าสถานะเมื่อกดปุ่มรอพิจารณา" },
-  { key: "TG_BTN_NOT_FOUND_TEXT", value: "🚫 ยังไม่มีในระบบ", description: "ข้อความปุ่ม Telegram: ยังไม่มีในระบบ" },
-  { key: "TG_BTN_NOT_FOUND_STATUS", value: "ยังไม่มีในระบบ", description: "ค่าสถานะเมื่อกดปุ่มยังไม่มีในระบบ" },
+  { key: "TG_BTN_NOT_FOUND_TEXT", value: "🚫 ยังไม่มีในระบบ d-pension", description: "ข้อความปุ่ม Telegram: ยังไม่มีในระบบ d-pension" },
+  { key: "TG_BTN_NOT_FOUND_STATUS", value: "ยังไม่มีในระบบ d-pension", description: "ค่าสถานะเมื่อกดปุ่มยังไม่มีในระบบ d-pension" },
   { key: "TG_BTN_APPROVE_TEXT", value: "✅ อนุมัติแล้ว", description: "ข้อความปุ่ม Telegram: อนุมัติแล้ว" },
   { key: "TG_BTN_APPROVE_STATUS", value: "อนุมัติแล้ว", description: "ค่าสถานะเมื่อกดปุ่มอนุมัติแล้ว" },
 ];
@@ -44,8 +44,8 @@ const TELEGRAM_ACTION_DEFAULTS: Record<TelegramAction, Omit<TelegramActionConfig
   NOT_FOUND: {
     textKey: "TG_BTN_NOT_FOUND_TEXT",
     statusKey: "TG_BTN_NOT_FOUND_STATUS",
-    buttonText: "🚫 ยังไม่มีในระบบ",
-    statusText: "ยังไม่มีในระบบ",
+    buttonText: "🚫 ยังไม่มีในระบบ d-pension",
+    statusText: "ยังไม่มีในระบบ d-pension",
     icon: "🚫",
   },
 };
@@ -99,11 +99,13 @@ export function invalidateSettingsCache() {
 
 export function getTelegramActionConfig(action: TelegramAction, settings: SettingsMap): TelegramActionConfig {
   const defaults = TELEGRAM_ACTION_DEFAULTS[action];
+  const buttonText = settings[defaults.textKey]?.trim() || defaults.buttonText;
+  const statusText = settings[defaults.statusKey]?.trim() || defaults.statusText;
 
   return {
     action,
-    buttonText: settings[defaults.textKey]?.trim() || defaults.buttonText,
-    statusText: settings[defaults.statusKey]?.trim() || defaults.statusText,
+    buttonText: action === "NOT_FOUND" && buttonText === "🚫 ยังไม่มีในระบบ" ? defaults.buttonText : buttonText,
+    statusText: action === "NOT_FOUND" && statusText === "ยังไม่มีในระบบ" ? defaults.statusText : statusText,
     icon: defaults.icon,
   };
 }

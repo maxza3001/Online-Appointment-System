@@ -557,10 +557,10 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
                   <button
                     type="button"
                     className="button-secondary status-quick-button"
-                    aria-pressed={modalStatus === "ยังไม่มีในระบบ"}
-                    onClick={() => setModalStatus("ยังไม่มีในระบบ")}
+                    aria-pressed={modalStatus === "ยังไม่มีในระบบ d-pension"}
+                    onClick={() => setModalStatus("ยังไม่มีในระบบ d-pension")}
                   >
-                    ยังไม่มีในระบบ
+                    ยังไม่มีในระบบ d-pension
                   </button>
                 </div>
 
