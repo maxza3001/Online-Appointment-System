@@ -554,6 +554,14 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
                       </option>
                     ))}
                   </select>
+                  <button
+                    type="button"
+                    className="button-secondary status-quick-button"
+                    aria-pressed={modalStatus === "ยังไม่มีในระบบ"}
+                    onClick={() => setModalStatus("ยังไม่มีในระบบ")}
+                  >
+                    ยังไม่มีในระบบ
+                  </button>
                 </div>
 
                 <div className="field full">

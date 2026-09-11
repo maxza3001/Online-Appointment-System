@@ -600,6 +600,11 @@ button {
   background: var(--pending-soft);
 }
 
+.status-badge.missing {
+  color: #68677a;
+  background: #eef0f5;
+}
+
 .status-badge.approved {
   color: var(--success-text);
   background: var(--success-soft);
@@ -608,6 +613,19 @@ button {
 .status-badge.cancelled {
   color: var(--danger-text);
   background: var(--danger-soft);
+}
+
+.status-quick-button {
+  width: fit-content;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 0.9rem;
+}
+
+.status-quick-button[aria-pressed="true"] {
+  color: white;
+  background: #68677a;
+  border-color: transparent;
 }
 
 .empty-state {

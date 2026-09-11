@@ -1,6 +1,6 @@
 export type SettingsMap = Record<string, string>;
 
-export type TelegramAction = "RECEIVE" | "PENDING" | "APPROVE";
+export type TelegramAction = "RECEIVE" | "PENDING" | "APPROVE" | "NOT_FOUND";
 
 export interface TelegramActionConfig {
   action: TelegramAction;

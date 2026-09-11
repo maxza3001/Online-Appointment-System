@@ -212,7 +212,8 @@ function sendTelegramNotification(payload) {
           { text: "⏳ รอพิจารณา", callback_data: `PENDING|${payload.reqId}` }
         ],
         [
-          { text: "✅ อนุมัติแล้ว", callback_data: `APPROVE|${payload.reqId}` }
+          { text: "✅ อนุมัติแล้ว", callback_data: `APPROVE|${payload.reqId}` },
+          { text: "🚫 ยังไม่มีในระบบ", callback_data: `NOT_FOUND|${payload.reqId}` }
         ]
       ]
     };
@@ -422,15 +423,21 @@ function doPost(e) {
     if (action === 'RECEIVE') {
       newStatus = "รับเรื่องแล้ว"; icon = "📥";
       newKeyboard = [
-        [{ text: "⏳ รอพิจารณา", callback_data: `PENDING|${reqId}` }, { text: "✅ อนุมัติแล้ว", callback_data: `APPROVE|${reqId}` }]
+        [{ text: "⏳ รอพิจารณา", callback_data: `PENDING|${reqId}` }, { text: "✅ อนุมัติแล้ว", callback_data: `APPROVE|${reqId}` }],
+        [{ text: "🚫 ยังไม่มีในระบบ", callback_data: `NOT_FOUND|${reqId}` }]
       ];
     } else if (action === 'PENDING') {
       newStatus = "รอพิจารณา"; icon = "⏳";
-      newKeyboard = [[ { text: "✅ อนุมัติแล้ว", callback_data: `APPROVE|${reqId}` } ]];
+      newKeyboard = [[ { text: "✅ อนุมัติแล้ว", callback_data: `APPROVE|${reqId}` }, { text: "🚫 ยังไม่มีในระบบ", callback_data: `NOT_FOUND|${reqId}` } ]];
     } else if (action === 'APPROVE') {
       newStatus = "อนุมัติแล้ว"; icon = "✅";
       newKeyboard = []; 
+    } else if (action === 'NOT_FOUND') {
+      newStatus = "ยังไม่มีในระบบ"; icon = "🚫";
+      newKeyboard = [];
     }
+
+    if (!newStatus) return ContentService.createTextOutput("OK");
 
     // --- 5. แอบอัปเดตข้อมูลลง Sheet เบื้องหลัง ---
     const ss = SpreadsheetApp.getActiveSpreadsheet();

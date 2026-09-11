@@ -56,6 +56,8 @@ insert into public.app_settings (key, value, description) values
   ('TG_BTN_RECEIVE_STATUS', 'รับเรื่องแล้ว', 'ค่าสถานะเมื่อกดปุ่มรับเรื่องแล้ว'),
   ('TG_BTN_PENDING_TEXT', '⏳ รอพิจารณา', 'ข้อความปุ่ม Telegram: รอพิจารณา'),
   ('TG_BTN_PENDING_STATUS', 'รอพิจารณา', 'ค่าสถานะเมื่อกดปุ่มรอพิจารณา'),
+  ('TG_BTN_NOT_FOUND_TEXT', '🚫 ยังไม่มีในระบบ', 'ข้อความปุ่ม Telegram: ยังไม่มีในระบบ'),
+  ('TG_BTN_NOT_FOUND_STATUS', 'ยังไม่มีในระบบ', 'ค่าสถานะเมื่อกดปุ่มยังไม่มีในระบบ'),
   ('TG_BTN_APPROVE_TEXT', '✅ อนุมัติแล้ว', 'ข้อความปุ่ม Telegram: อนุมัติแล้ว'),
   ('TG_BTN_APPROVE_STATUS', 'อนุมัติแล้ว', 'ค่าสถานะเมื่อกดปุ่มอนุมัติแล้ว')
 on conflict (key) do nothing;

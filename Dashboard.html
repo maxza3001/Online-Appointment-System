@@ -30,6 +30,7 @@
       <option value="รออนุมัติ">รออนุมัติ</option>
       <option value="รับเรื่องแล้ว">รับเรื่องแล้ว</option>
       <option value="รอพิจารณา">รอพิจารณา</option>
+      <option value="ยังไม่มีในระบบ">ยังไม่มีในระบบ</option>
       <option value="อนุมัติแล้ว">อนุมัติแล้ว</option>
     </select>
   </div>
@@ -69,8 +70,13 @@
         <option value="รออนุมัติ">รออนุมัติ</option>
         <option value="รับเรื่องแล้ว">รับเรื่องแล้ว</option>
         <option value="รอพิจารณา">รอพิจารณา</option>
+        <option value="ยังไม่มีในระบบ">ยังไม่มีในระบบ</option>
         <option value="อนุมัติแล้ว">อนุมัติแล้ว</option>
       </select>
+      <button type="button" onclick="setMissingStatus()"
+        class="mt-2 px-3 py-1.5 bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-sm hover:bg-gray-200 transition">
+        ยังไม่มีในระบบ
+      </button>
     </div>
 
     <div class="mb-4">

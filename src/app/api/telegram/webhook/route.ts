@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function isTelegramAction(value: string): value is TelegramAction {
-  return value === "RECEIVE" || value === "PENDING" || value === "APPROVE";
+  return value === "RECEIVE" || value === "PENDING" || value === "APPROVE" || value === "NOT_FOUND";
 }
 
 export async function POST(request: Request) {

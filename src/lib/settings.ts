@@ -13,6 +13,8 @@ const DEFAULT_SETTINGS_ROWS = [
   { key: "TG_BTN_RECEIVE_STATUS", value: "รับเรื่องแล้ว", description: "ค่าสถานะเมื่อกดปุ่มรับเรื่องแล้ว" },
   { key: "TG_BTN_PENDING_TEXT", value: "⏳ รอพิจารณา", description: "ข้อความปุ่ม Telegram: รอพิจารณา" },
   { key: "TG_BTN_PENDING_STATUS", value: "รอพิจารณา", description: "ค่าสถานะเมื่อกดปุ่มรอพิจารณา" },
+  { key: "TG_BTN_NOT_FOUND_TEXT", value: "🚫 ยังไม่มีในระบบ", description: "ข้อความปุ่ม Telegram: ยังไม่มีในระบบ" },
+  { key: "TG_BTN_NOT_FOUND_STATUS", value: "ยังไม่มีในระบบ", description: "ค่าสถานะเมื่อกดปุ่มยังไม่มีในระบบ" },
   { key: "TG_BTN_APPROVE_TEXT", value: "✅ อนุมัติแล้ว", description: "ข้อความปุ่ม Telegram: อนุมัติแล้ว" },
   { key: "TG_BTN_APPROVE_STATUS", value: "อนุมัติแล้ว", description: "ค่าสถานะเมื่อกดปุ่มอนุมัติแล้ว" },
 ];
@@ -38,6 +40,13 @@ const TELEGRAM_ACTION_DEFAULTS: Record<TelegramAction, Omit<TelegramActionConfig
     buttonText: "✅ อนุมัติแล้ว",
     statusText: "อนุมัติแล้ว",
     icon: "✅",
+  },
+  NOT_FOUND: {
+    textKey: "TG_BTN_NOT_FOUND_TEXT",
+    statusKey: "TG_BTN_NOT_FOUND_STATUS",
+    buttonText: "🚫 ยังไม่มีในระบบ",
+    statusText: "ยังไม่มีในระบบ",
+    icon: "🚫",
   },
 };
 
@@ -102,13 +111,13 @@ export function getTelegramActionConfig(action: TelegramAction, settings: Settin
 export function getInitialTelegramActionRows(): TelegramAction[][] {
   return [
     ["RECEIVE", "PENDING"],
-    ["APPROVE"],
+    ["APPROVE", "NOT_FOUND"],
   ];
 }
 
 export function getNextTelegramActionRows(action: TelegramAction): TelegramAction[][] {
-  if (action === "RECEIVE") return [["PENDING", "APPROVE"]];
-  if (action === "PENDING") return [["APPROVE"]];
+  if (action === "RECEIVE") return [["PENDING", "APPROVE"], ["NOT_FOUND"]];
+  if (action === "PENDING") return [["APPROVE", "NOT_FOUND"]];
   return [];
 }
 
