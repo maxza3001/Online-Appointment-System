@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import QRCode from "qrcode";
-import { useEffect, useState, type FormEvent, type KeyboardEvent as KeyboardEventType } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent as KeyboardEventType } from "react";
 
 import { BOOKING_TOPIC_GROUPS, getBookingTopic } from "@/lib/booking-options";
 
@@ -37,6 +37,17 @@ type CreateBookingResponse = {
   message: string;
   booking: BookingStatus;
 };
+
+const THEME_STORAGE_KEY = "appointment-system-color-theme";
+const COLOR_THEMES = [
+  { id: "rose", label: "ชมพูเดิม", swatch: "#ea8aa1" },
+  { id: "mint", label: "มิ้นต์", swatch: "#6fa989" },
+  { id: "lavender", label: "ลาเวนเดอร์", swatch: "#9a7fba" },
+  { id: "sky", label: "ฟ้า", swatch: "#6b9db8" },
+  { id: "peach", label: "พีช", swatch: "#dd9273" },
+  { id: "gold", label: "ทองอ่อน", swatch: "#bd9855" },
+] as const;
+type ColorTheme = (typeof COLOR_THEMES)[number]["id"];
 
 async function readApiResponse<T>(response: Response): Promise<T> {
   const payload = (await response.json().catch(() => null)) as { message?: string } | null;
@@ -84,7 +95,9 @@ function QueueQrCode({ ticketId }: { ticketId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    void QRCode.toDataURL(ticketId, {
+    const trackingUrl = new URL("/", window.location.origin);
+    trackingUrl.searchParams.set("ticketId", ticketId);
+    void QRCode.toDataURL(trackingUrl.toString(), {
       errorCorrectionLevel: "H",
       margin: 2,
       width: 240,
@@ -111,7 +124,7 @@ function QueueQrCode({ ticketId }: { ticketId: string }) {
           <span className="qr-placeholder">{hasError ? "สร้าง QR Code ไม่สำเร็จ" : "กำลังสร้าง QR Code…"}</span>
         )}
       </div>
-      <p>สแกนเพื่ออ่านหมายเลขคิว</p>
+      <p>สแกนเพื่อเปิดติดตามสถานะคิว</p>
       {imageSource ? (
         <a className="qr-download" href={imageSource} download={`queue-${ticketId}.png`}>
           ดาวน์โหลด QR Code
@@ -123,6 +136,8 @@ function QueueQrCode({ ticketId }: { ticketId: string }) {
 
 export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
   const [activeTab, setActiveTab] = useState<"book" | "track">("book");
+  const [colorTheme, setColorTheme] = useState<ColorTheme>("rose");
+  const [isThemeReady, setIsThemeReady] = useState(false);
   const [agencyDropdownOpen, setAgencyDropdownOpen] = useState(false);
   const [activeAgencyIndex, setActiveAgencyIndex] = useState(0);
   const [form, setForm] = useState<BookingForm>(() => ({
@@ -143,6 +158,53 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
   const [statusResult, setStatusResult] = useState<BookingStatus | null>(null);
   const [statusError, setStatusError] = useState("");
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const autoLookupTicketRef = useRef("");
+
+  const lookupBookingStatus = useCallback(async (rawTicketId: string) => {
+    const ticketId = rawTicketId.trim().toUpperCase();
+    setTicketInput(ticketId);
+    setActiveTab("track");
+    if (!ticketId) {
+      setStatusError("กรุณากรอกหมายเลขคิว");
+      setStatusResult(null);
+      return;
+    }
+
+    setIsCheckingStatus(true);
+    setStatusError("");
+    setStatusResult(null);
+    try {
+      const response = await fetch(`/api/bookings?ticketId=${encodeURIComponent(ticketId)}`, { cache: "no-store" });
+      const result = await readApiResponse<{ found: boolean } & BookingStatus>(response);
+      if (result.found) setStatusResult(result);
+      else setStatusError("ไม่พบหมายเลขคิวนี้ในระบบ กรุณาตรวจสอบรหัสอีกครั้ง");
+    } catch (error) {
+      setStatusError(getFriendlySystemError(error, "ค้นหาสถานะคิวไม่สำเร็จ"));
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const validTheme = COLOR_THEMES.find((theme) => theme.id === savedTheme);
+    if (validTheme) setColorTheme(validTheme.id);
+    setIsThemeReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isThemeReady) return;
+    document.documentElement.dataset.colorTheme = colorTheme;
+    window.localStorage.setItem(THEME_STORAGE_KEY, colorTheme);
+  }, [colorTheme, isThemeReady]);
+
+  useEffect(() => {
+    const ticketId = new URLSearchParams(window.location.search).get("ticketId")?.trim().toUpperCase();
+    if (!ticketId || autoLookupTicketRef.current === ticketId) return;
+    autoLookupTicketRef.current = ticketId;
+    setActiveTab("track");
+    void lookupBookingStatus(ticketId);
+  }, [lookupBookingStatus]);
 
   const selectedTopic = getBookingTopic(form.topicId);
   const agencyQuery = form.agency.trim().toLocaleLowerCase("th-TH");
@@ -283,28 +345,9 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
     }
   }
 
-  async function handleStatusLookup(event: FormEvent<HTMLFormElement>) {
+  function handleStatusLookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const ticketId = ticketInput.trim().toUpperCase();
-    if (!ticketId) {
-      setStatusError("กรุณากรอกหมายเลขคิว");
-      setStatusResult(null);
-      return;
-    }
-
-    setIsCheckingStatus(true);
-    setStatusError("");
-    setStatusResult(null);
-    try {
-      const response = await fetch(`/api/bookings?ticketId=${encodeURIComponent(ticketId)}`, { cache: "no-store" });
-      const result = await readApiResponse<{ found: boolean } & BookingStatus>(response);
-      if (result.found) setStatusResult(result);
-      else setStatusError("ไม่พบหมายเลขคิวนี้ในระบบ กรุณาตรวจสอบรหัสอีกครั้ง");
-    } catch (error) {
-      setStatusError(getFriendlySystemError(error, "ค้นหาสถานะคิวไม่สำเร็จ"));
-    } finally {
-      setIsCheckingStatus(false);
-    }
+    void lookupBookingStatus(ticketInput);
   }
 
   function closeConfirmation() {
@@ -353,7 +396,25 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
               ติดตามสถานะคิว
             </button>
           </div>
-          <div className="today-label"><span className="today-label-dot" /> วันนี้ {formatThaiDate(dateToday, false)}</div>
+          <div className="control-meta">
+            <div className="theme-picker" role="group" aria-label="เลือกสีธีม">
+              <span className="theme-picker-label">ธีมสี</span>
+              {COLOR_THEMES.map((theme) => (
+                <button
+                  key={theme.id}
+                  type="button"
+                  className={`theme-option ${colorTheme === theme.id ? "is-active" : ""}`}
+                  aria-label={theme.label}
+                  aria-pressed={colorTheme === theme.id}
+                  title={theme.label}
+                  onClick={() => setColorTheme(theme.id)}
+                >
+                  <span className="theme-swatch" style={{ backgroundColor: theme.swatch }} />
+                </button>
+              ))}
+            </div>
+            <div className="today-label"><span className="today-label-dot" /> วันนี้ {formatThaiDate(dateToday, false)}</div>
+          </div>
         </div>
 
         {activeTab === "book" ? (
@@ -589,6 +650,20 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
         )}
 
       </div>
+
+      <footer className="developer-footer" aria-label="ข้อมูลผู้พัฒนา">
+        <div className="developer-card">
+          <p className="developer-name">
+            <span className="developer-icons" aria-hidden="true">
+              <span>🦋</span>
+              <span>👧</span>
+            </span>
+            <span>พรรณลิณี แผนเมือง</span>
+          </p>
+          <p className="developer-role">นักวิชาการเงินและบัญชี กลุ่มงานวิชาการ</p>
+          <p className="developer-caption">ผู้พัฒนาระบบนัดหมายบริการส่วนราชการ</p>
+        </div>
+      </footer>
 
       {confirmation ? (
         <div className="modal-backdrop" role="presentation">
