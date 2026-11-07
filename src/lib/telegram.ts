@@ -117,9 +117,17 @@ export async function sendTelegramBookingNotification(settings: SettingsMap, pay
     chat_id: chatId,
     text: message,
     parse_mode: "HTML",
-    ...(trackingUrl.protocol === "https:"
-      ? { reply_markup: { inline_keyboard: [[{ text: "🔎 ติดตามสถานะคิว", url: trackingUrl.toString() }]] } }
-      : {}),
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ ยืนยันนัดหมาย", callback_data: `BOOKING_CONFIRM|${payload.ticketId}` },
+          { text: "❌ ยกเลิกคิว", callback_data: `BOOKING_CANCEL|${payload.ticketId}` },
+        ],
+        ...(trackingUrl.protocol === "https:"
+          ? [[{ text: "🔎 ติดตามสถานะคิว", url: trackingUrl.toString() }]]
+          : []),
+      ],
+    },
   });
 
   if (!result.ok) {
@@ -127,6 +135,36 @@ export async function sendTelegramBookingNotification(settings: SettingsMap, pay
   }
 
   return { configured: true, sent: true };
+}
+
+export async function sendTelegramBookingCallbackFeedback(settings: SettingsMap, payload: {
+  callbackId: string;
+  messageId: number;
+  chatId: number | string;
+  ticketId: string;
+  status: string;
+  actionBy: string;
+}) {
+  const token = settings.TELEGRAM_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) return;
+
+  await Promise.all([
+    callTelegramApi(token, "answerCallbackQuery", {
+      callback_query_id: payload.callbackId,
+      text: `อัปเดตสถานะคิวเป็น: ${payload.status}`,
+    }),
+    callTelegramApi(token, "editMessageReplyMarkup", {
+      chat_id: payload.chatId,
+      message_id: payload.messageId,
+      reply_markup: { inline_keyboard: [] },
+    }),
+    callTelegramApi(token, "sendMessage", {
+      chat_id: payload.chatId,
+      text: `🎫 คิว ${payload.ticketId} อัปเดตสถานะเป็น <b>${escapeTelegramHtml(payload.status)}</b>\n👤 ผู้ดำเนินการ: ${escapeTelegramHtml(payload.actionBy)}`,
+      parse_mode: "HTML",
+      reply_to_message_id: payload.messageId,
+    }),
+  ]);
 }
 
 export async function sendTelegramStatusNotification(settings: SettingsMap, payload: {

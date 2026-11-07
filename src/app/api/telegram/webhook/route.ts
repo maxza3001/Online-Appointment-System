@@ -1,6 +1,7 @@
 import { getSettingsMap } from "@/lib/settings";
+import { updateBookingStatusFromTelegram } from "@/lib/bookings";
 import { getRequestTelegramContextByReqId, persistTelegramStatusUpdate } from "@/lib/requests";
-import { sendTelegramCallbackFeedback } from "@/lib/telegram";
+import { sendTelegramBookingCallbackFeedback, sendTelegramCallbackFeedback } from "@/lib/telegram";
 import type { TelegramAction } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -16,28 +17,47 @@ export async function POST(request: Request) {
     const callbackQuery = update?.callback_query;
     if (!callbackQuery) return Response.json({ ok: true });
 
-    const [action, reqId] = String(callbackQuery.data ?? "").split("|");
-    if (!reqId || !isTelegramAction(action)) return Response.json({ ok: true });
+    const [action, recordId] = String(callbackQuery.data ?? "").split("|");
+    if (!recordId) return Response.json({ ok: true });
 
     const actorName = [callbackQuery.from?.first_name, callbackQuery.from?.last_name]
       .filter(Boolean)
       .join(" ") || "เจ้าหน้าที่";
 
     const settings = await getSettingsMap();
-    const requestContext = await getRequestTelegramContextByReqId(reqId);
+
+    if (action === "BOOKING_CONFIRM" || action === "BOOKING_CANCEL") {
+      const messageId = callbackQuery.message?.message_id;
+      const chatId = callbackQuery.message?.chat?.id;
+      if (!messageId || !chatId) return Response.json({ ok: true });
+
+      const result = await updateBookingStatusFromTelegram(settings, recordId, action, chatId);
+      await sendTelegramBookingCallbackFeedback(settings, {
+        callbackId: callbackQuery.id,
+        messageId,
+        chatId,
+        ticketId: result.ticketId,
+        status: result.status,
+        actionBy: actorName,
+      });
+      return Response.json({ ok: true });
+    }
+
+    if (!isTelegramAction(action)) return Response.json({ ok: true });
+    const requestContext = await getRequestTelegramContextByReqId(recordId);
 
     await sendTelegramCallbackFeedback(settings, {
       action,
       requestSummary: requestContext?.requestSummary,
       agency: requestContext?.agency,
-      reqId,
+      reqId: recordId,
       callbackId: callbackQuery.id,
       messageId: callbackQuery.message?.message_id,
       chatId: callbackQuery.message?.chat?.id,
       actionBy: actorName,
     });
 
-    await persistTelegramStatusUpdate(reqId, action);
+    await persistTelegramStatusUpdate(recordId, action);
   } catch (error) {
     console.error(error);
   }

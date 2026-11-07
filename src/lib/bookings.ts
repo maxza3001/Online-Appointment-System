@@ -5,7 +5,7 @@ import { randomInt } from "node:crypto";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSettingsMap } from "@/lib/settings";
 import { sendTelegramBookingNotification } from "@/lib/telegram";
-import { BOOKING_TIME_SLOTS, getBookingTopic } from "@/lib/booking-options";
+import { BOOKING_TIME_SLOTS, BOOKING_TOPIC_GROUPS, getBookingTopic } from "@/lib/booking-options";
 import type { CreateBookingInput } from "@/lib/types";
 import { AppError, formatBangkokDay } from "@/lib/utils";
 
@@ -164,6 +164,60 @@ export async function createBooking(input: CreateBookingInput, appOrigin: string
   }
 
   throw new AppError("สร้างหมายเลขคิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง", 500);
+}
+
+export async function updateBookingStatusFromTelegram(
+  settings: Record<string, string>,
+  ticketId: string,
+  action: "BOOKING_CONFIRM" | "BOOKING_CANCEL",
+  callbackChatId: number | string,
+) {
+  const normalizedTicketId = ticketId.trim().toUpperCase();
+  if (!/^NID-[A-Z0-9]{6}$/.test(normalizedTicketId)) {
+    throw new AppError("รูปแบบหมายเลขคิวไม่ถูกต้อง", 400);
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: booking, error: lookupError } = await supabase
+    .from("bookings")
+    .select("ticket_id, department, status")
+    .eq("ticket_id", normalizedTicketId)
+    .maybeSingle();
+
+  if (lookupError) throw new AppError(`ค้นหาคิวไม่สำเร็จ: ${lookupError.message}`, 500);
+  if (!booking) throw new AppError("ไม่พบหมายเลขคิวนี้", 404);
+
+  const groupIndex = BOOKING_TOPIC_GROUPS.findIndex((group) => group.department === booking.department);
+  const groupChatKeys = [
+    "TELEGRAM_CHAT_ID_BOOKING_ADMIN",
+    "TELEGRAM_CHAT_ID_BOOKING_ACADEMIC",
+    "TELEGRAM_CHAT_ID_BOOKING_GF",
+    "TELEGRAM_CHAT_ID_BOOKING_POLICY",
+  ];
+  const allowedChatId = (groupIndex >= 0 ? settings[groupChatKeys[groupIndex]]?.trim() : "")
+    || settings.TELEGRAM_CHAT_ID?.trim()
+    || process.env.TELEGRAM_CHAT_ID?.trim();
+  if (!allowedChatId || String(callbackChatId) !== allowedChatId) {
+    throw new AppError("กลุ่ม Telegram นี้ไม่มีสิทธิ์เปลี่ยนสถานะคิว", 403);
+  }
+
+  const nextStatus = action === "BOOKING_CONFIRM" ? "ยืนยันแล้ว" : "ยกเลิก";
+  if (booking.status !== "รอตอบรับ") return { ticketId: normalizedTicketId, status: booking.status, updated: false };
+
+  const { data: updatedBooking, error: updateError } = await supabase
+    .from("bookings")
+    .update({ status: nextStatus })
+    .eq("ticket_id", normalizedTicketId)
+    .eq("status", "รอตอบรับ")
+    .select("status")
+    .maybeSingle();
+
+  if (updateError) throw new AppError(`ปรับสถานะคิวไม่สำเร็จ: ${updateError.message}`, 500);
+  return {
+    ticketId: normalizedTicketId,
+    status: updatedBooking?.status ?? booking.status,
+    updated: Boolean(updatedBooking),
+  };
 }
 
 export async function checkBookingStatus(ticketId: string) {
