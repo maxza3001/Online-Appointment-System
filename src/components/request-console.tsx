@@ -413,7 +413,7 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
                 </button>
               ))}
             </div>
-            <div className="today-label"><span className="today-label-dot" /> วันนี้ {formatThaiDate(dateToday, false)}</div>
+            <div className="today-label"><span className="today-label-dot" /> {formatThaiDate(dateToday, false)}</div>
           </div>
         </div>
 
