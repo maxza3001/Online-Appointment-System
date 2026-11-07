@@ -28,6 +28,14 @@ export interface CreateRequestInput {
   agency: string;
 }
 
+export interface CreateBookingInput {
+  agency: string;
+  topicId: string;
+  topicOther?: string;
+  date: string;
+  timeSlot: string;
+}
+
 export interface UpdateRequestStatusInput {
   status: string;
   note?: string;

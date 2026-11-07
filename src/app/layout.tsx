@@ -15,8 +15,8 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ระบบแจ้งเตือนคำขอหนังสือบำเหน็จค้ำประกัน",
-  description: "ระบบบันทึกคำขอ พร้อม Telegram notification และปุ่มอัปเดตสถานะผ่านแชท",
+  title: "ระบบนัดหมายออนไลน์",
+  description: "จองคิวและติดตามสถานะการนัดหมายออนไลน์",
 };
 
 export default function RootLayout({
