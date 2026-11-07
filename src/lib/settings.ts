@@ -4,6 +4,10 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { SettingsMap, TelegramAction, TelegramActionConfig } from "@/lib/types";
 
 const DEFAULT_SETTINGS_ROWS = [
+  { key: "TELEGRAM_CHAT_ID_BOOKING_ADMIN", value: "", description: "Telegram chat ID for ฝ่ายบริหารทั่วไป bookings" },
+  { key: "TELEGRAM_CHAT_ID_BOOKING_ACADEMIC", value: "", description: "Telegram chat ID for กลุ่มงานวิชาการ bookings" },
+  { key: "TELEGRAM_CHAT_ID_BOOKING_GF", value: "", description: "Telegram chat ID for กลุ่มงานระบบการคลัง GF bookings" },
+  { key: "TELEGRAM_CHAT_ID_BOOKING_POLICY", value: "", description: "Telegram chat ID for กลุ่มนโยบายเศรษฐกิจการคลัง bookings" },
   { key: "TELEGRAM_BOT_TOKEN", value: "", description: "Token จาก BotFather" },
   { key: "TELEGRAM_CHAT_ID", value: "", description: "Chat ID ของกลุ่มหรือบุคคล" },
   { key: "SEND_FULL_ID", value: "FALSE", description: "ตั้งเป็น TRUE หากต้องการส่งเลขบัตรเต็มไปใน Telegram" },

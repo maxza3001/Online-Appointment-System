@@ -1,5 +1,20 @@
 create extension if not exists pgcrypto;
 
+create table if not exists public.app_settings (
+  key text primary key,
+  value text not null default '',
+  description text
+);
+
+insert into public.app_settings (key, value, description) values
+  ('TELEGRAM_BOT_TOKEN', '', 'Existing Telegram bot token from BotFather'),
+  ('TELEGRAM_CHAT_ID', '', 'Fallback Telegram chat ID for bookings without a department chat ID'),
+  ('TELEGRAM_CHAT_ID_BOOKING_ADMIN', '', 'Telegram chat ID for ฝ่ายบริหารทั่วไป bookings'),
+  ('TELEGRAM_CHAT_ID_BOOKING_ACADEMIC', '', 'Telegram chat ID for กลุ่มงานวิชาการ bookings'),
+  ('TELEGRAM_CHAT_ID_BOOKING_GF', '', 'Telegram chat ID for กลุ่มงานระบบการคลัง GF bookings'),
+  ('TELEGRAM_CHAT_ID_BOOKING_POLICY', '', 'Telegram chat ID for กลุ่มนโยบายเศรษฐกิจการคลัง bookings')
+on conflict (key) do nothing;
+
 create table if not exists public.bookings (
   id uuid primary key default gen_random_uuid(),
   ticket_id text not null unique,

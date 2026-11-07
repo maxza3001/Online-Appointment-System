@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       return Response.json({ message: parsed.error.issues[0]?.message ?? "ข้อมูลการจองไม่ถูกต้อง" }, { status: 400 });
     }
 
-    const result = await createBooking(parsed.data);
+    const result = await createBooking(parsed.data, new URL(request.url).origin);
     return Response.json(result, { status: 201 });
   } catch (error) {
     return createServerErrorResponse(error);

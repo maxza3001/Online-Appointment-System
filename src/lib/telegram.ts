@@ -7,6 +7,7 @@ import {
   getTelegramActionConfig,
 } from "@/lib/settings";
 import type { SettingsMap, TelegramAction, TelegramRequestNotificationPayload } from "@/lib/types";
+import { BOOKING_TOPIC_GROUPS } from "@/lib/booking-options";
 import { escapeTelegramHtml } from "@/lib/utils";
 
 type TelegramApiResult = {
@@ -74,6 +75,58 @@ export async function sendTelegramRequestNotification(settings: SettingsMap, pay
   }
 
   return { statusText: "Error", message: "(ส่ง Telegram ไม่สำเร็จ)" };
+}
+
+export async function sendTelegramBookingNotification(settings: SettingsMap, payload: {
+  ticketId: string;
+  agency: string;
+  topic: string;
+  department: string;
+  date: string;
+  timeSlot: string;
+}, appOrigin: string) {
+  const token = settings.TELEGRAM_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  const chatSettingKeys = [
+    "TELEGRAM_CHAT_ID_BOOKING_ADMIN",
+    "TELEGRAM_CHAT_ID_BOOKING_ACADEMIC",
+    "TELEGRAM_CHAT_ID_BOOKING_GF",
+    "TELEGRAM_CHAT_ID_BOOKING_POLICY",
+  ];
+  const groupIndex = BOOKING_TOPIC_GROUPS.findIndex((group) => group.department === payload.department);
+  const groupChatId = groupIndex >= 0 ? settings[chatSettingKeys[groupIndex]]?.trim() : "";
+  const chatId = groupChatId || settings.TELEGRAM_CHAT_ID?.trim() || process.env.TELEGRAM_CHAT_ID?.trim();
+  if (!token || !chatId) return { configured: false, sent: false };
+
+  const trackingUrl = new URL("/", appOrigin);
+  trackingUrl.searchParams.set("ticketId", payload.ticketId);
+  const appointmentDate = new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "Asia/Bangkok",
+  }).format(new Date(`${payload.date}T00:00:00+07:00`));
+  const message = `📅 <b>มีการจองนัดหมายใหม่</b>\n\n` +
+    `🎫 <b>หมายเลขคิว:</b> ${escapeTelegramHtml(payload.ticketId)}\n` +
+    `🏢 <b>ส่วนราชการ:</b> ${escapeTelegramHtml(payload.agency)}\n` +
+    `📌 <b>เรื่องที่ขอรับบริการ:</b> ${escapeTelegramHtml(payload.topic)}\n` +
+    `👥 <b>กลุ่มงาน:</b> ${escapeTelegramHtml(payload.department)}\n` +
+    `🗓️ <b>วันที่เข้าพบ:</b> ${escapeTelegramHtml(appointmentDate)}\n` +
+    `⏰ <b>ช่วงเวลา:</b> ${escapeTelegramHtml(payload.timeSlot)}\n` +
+    `📌 <b>สถานะ:</b> รอตอบรับ`;
+  const result = await callTelegramApi(token, "sendMessage", {
+    chat_id: chatId,
+    text: message,
+    parse_mode: "HTML",
+    ...(trackingUrl.protocol === "https:"
+      ? { reply_markup: { inline_keyboard: [[{ text: "🔎 ติดตามสถานะคิว", url: trackingUrl.toString() }]] } }
+      : {}),
+  });
+
+  if (!result.ok) {
+    throw new Error(result.description || "Telegram ส่งข้อความแจ้งเตือนไม่สำเร็จ");
+  }
+
+  return { configured: true, sent: true };
 }
 
 export async function sendTelegramStatusNotification(settings: SettingsMap, payload: {

@@ -3,6 +3,8 @@ import "server-only";
 import { randomInt } from "node:crypto";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getSettingsMap } from "@/lib/settings";
+import { sendTelegramBookingNotification } from "@/lib/telegram";
 import { BOOKING_TIME_SLOTS, getBookingTopic } from "@/lib/booking-options";
 import type { CreateBookingInput } from "@/lib/types";
 import { AppError, formatBangkokDay } from "@/lib/utils";
@@ -60,7 +62,7 @@ export async function getAvailableBookingSlots(date: string, topicId: string) {
   }));
 }
 
-export async function createBooking(input: CreateBookingInput) {
+export async function createBooking(input: CreateBookingInput, appOrigin: string) {
   const topic = getBookingTopic(input.topicId);
   if (!topic) {
     throw new AppError("เรื่องที่ขอรับบริการไม่ถูกต้อง");
@@ -105,6 +107,23 @@ export async function createBooking(input: CreateBookingInput) {
     });
 
     if (!error) {
+      try {
+        const telegramSettings = await getSettingsMap();
+        const notification = await sendTelegramBookingNotification(telegramSettings, {
+          ticketId,
+          agency,
+          topic: topicText,
+          department: topic.department,
+          date: input.date,
+          timeSlot: timeSlot.label,
+        }, appOrigin);
+        if (!notification.configured) {
+          console.warn("Telegram booking notification skipped: bot token or chat ID is not configured.");
+        }
+      } catch (notificationError) {
+        console.error("ส่ง Telegram แจ้งเตือนการจองไม่สำเร็จ", notificationError);
+      }
+
       return {
         success: true,
         ticketId,

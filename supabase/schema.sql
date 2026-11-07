@@ -24,7 +24,7 @@ create table if not exists public.requests (
   note text not null default '-',
   telegram_status text not null default 'Pending',
   created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())65
+  updated_at timestamptz not null default timezone('utc', now())
 );
 
 drop index if exists public.requests_unique_person_per_day;
@@ -77,3 +77,11 @@ set
 where
   (key = 'TG_BTN_NOT_FOUND_TEXT' and value = '🚫 ยังไม่มีในระบบ')
   or (key = 'TG_BTN_NOT_FOUND_STATUS' and value = 'ยังไม่มีในระบบ');
+
+-- Optional Telegram destinations for appointment notifications, by responsible department.
+insert into public.app_settings (key, value, description) values
+  ('TELEGRAM_CHAT_ID_BOOKING_ADMIN', '', 'Telegram chat ID for ฝ่ายบริหารทั่วไป bookings'),
+  ('TELEGRAM_CHAT_ID_BOOKING_ACADEMIC', '', 'Telegram chat ID for กลุ่มงานวิชาการ bookings'),
+  ('TELEGRAM_CHAT_ID_BOOKING_GF', '', 'Telegram chat ID for กลุ่มงานระบบการคลัง GF bookings'),
+  ('TELEGRAM_CHAT_ID_BOOKING_POLICY', '', 'Telegram chat ID for กลุ่มนโยบายเศรษฐกิจการคลัง bookings')
+on conflict (key) do nothing;
