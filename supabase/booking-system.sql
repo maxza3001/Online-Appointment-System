@@ -7,13 +7,26 @@ create table if not exists public.app_settings (
 );
 
 insert into public.app_settings (key, value, description) values
-  ('TELEGRAM_BOT_TOKEN', '', 'Existing Telegram bot token from BotFather'),
-  ('TELEGRAM_CHAT_ID', '', 'Fallback Telegram chat ID for bookings without a department chat ID'),
   ('TELEGRAM_CHAT_ID_BOOKING_ADMIN', '', 'Telegram chat ID for ฝ่ายบริหารทั่วไป bookings'),
   ('TELEGRAM_CHAT_ID_BOOKING_ACADEMIC', '', 'Telegram chat ID for กลุ่มงานวิชาการ bookings'),
   ('TELEGRAM_CHAT_ID_BOOKING_GF', '', 'Telegram chat ID for กลุ่มงานระบบการคลัง GF bookings'),
-  ('TELEGRAM_CHAT_ID_BOOKING_POLICY', '', 'Telegram chat ID for กลุ่มนโยบายเศรษฐกิจการคลัง bookings')
-on conflict (key) do nothing;
+  ('TELEGRAM_CHAT_ID_BOOKING_POLICY', '', 'Telegram chat ID for กลุ่มนโยบายเศรษฐกิจการคลัง bookings'),
+  ('APP_TITLE', 'ระบบนัดหมายออนไลน์', 'ชื่อระบบนัดหมายออนไลน์'),
+  ('TELEGRAM_BOT_TOKEN', '', 'Token จาก BotFather'),
+  ('TELEGRAM_CHAT_ID', '', 'Chat ID สำรองเมื่อยังไม่ได้กำหนดห้องของกลุ่มงาน'),
+  ('TELEGRAM_BOOKING_CONFIRM_TEXT', '✅ ยืนยันนัดหมาย', 'ข้อความปุ่ม Telegram: ยืนยันนัดหมาย'),
+  ('TELEGRAM_BOOKING_CANCEL_TEXT', '❌ ยกเลิกคิว', 'ข้อความปุ่ม Telegram: ยกเลิกคิว'),
+  ('TELEGRAM_BOOKING_CANCEL_REASON_TEXT', '✍️ ระบุเหตุผล', 'ข้อความปุ่ม Telegram: ระบุเหตุผลการยกเลิก'),
+  ('TELEGRAM_BOOKING_CANCEL_SKIP_TEXT', 'ยกเลิกโดยไม่ระบุเหตุผล', 'ข้อความปุ่ม Telegram: ยกเลิกโดยไม่ระบุเหตุผล')
+on conflict (key) do update set description = excluded.description;
+
+update public.app_settings
+set value = 'ระบบนัดหมายออนไลน์', description = 'ชื่อระบบนัดหมายออนไลน์'
+where key = 'APP_TITLE' and value = 'ระบบบำเหน็จค้ำประกัน';
+
+delete from public.app_settings
+where key in ('ENABLE_DASHBOARD', 'SEND_FULL_ID')
+  or key like 'TG_BTN_%';
 
 create table if not exists public.bookings (
   id uuid primary key default gen_random_uuid(),

@@ -120,8 +120,8 @@ export async function sendTelegramBookingNotification(settings: SettingsMap, pay
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "✅ ยืนยันนัดหมาย", callback_data: `BOOKING_CONFIRM|${payload.ticketId}` },
-          { text: "❌ ยกเลิกคิว", callback_data: `BOOKING_CANCEL|${payload.ticketId}` },
+          { text: settings.TELEGRAM_BOOKING_CONFIRM_TEXT?.trim() || "✅ ยืนยันนัดหมาย", callback_data: `BOOKING_CONFIRM|${payload.ticketId}` },
+          { text: settings.TELEGRAM_BOOKING_CANCEL_TEXT?.trim() || "❌ ยกเลิกคิว", callback_data: `BOOKING_CANCEL|${payload.ticketId}` },
         ],
         ...(trackingUrl.protocol === "https:"
           ? [[{ text: "🔎 ติดตามสถานะคิว", url: trackingUrl.toString() }]]
@@ -207,7 +207,7 @@ export async function sendTelegramBookingCancellationPrompt(settings: SettingsMa
     message_id: payload.bookingMessageId,
     reply_markup: {
       inline_keyboard: [[{
-        text: "ยกเลิกโดยไม่ระบุเหตุผล",
+        text: settings.TELEGRAM_BOOKING_CANCEL_SKIP_TEXT?.trim() || "ยกเลิกโดยไม่ระบุเหตุผล",
         callback_data: `BOOKING_CANCEL_SKIP|${payload.ticketId}`,
       }]],
     },
@@ -234,8 +234,8 @@ export async function sendTelegramBookingCancellationOptions(settings: SettingsM
     message_id: payload.bookingMessageId,
     reply_markup: {
       inline_keyboard: [[
-        { text: "✍️ ระบุเหตุผล", callback_data: `BOOKING_CANCEL_REASON|${payload.ticketId}` },
-        { text: "ยกเลิกโดยไม่ระบุเหตุผล", callback_data: `BOOKING_CANCEL_SKIP|${payload.ticketId}` },
+        { text: settings.TELEGRAM_BOOKING_CANCEL_REASON_TEXT?.trim() || "✍️ ระบุเหตุผล", callback_data: `BOOKING_CANCEL_REASON|${payload.ticketId}` },
+        { text: settings.TELEGRAM_BOOKING_CANCEL_SKIP_TEXT?.trim() || "ยกเลิกโดยไม่ระบุเหตุผล", callback_data: `BOOKING_CANCEL_SKIP|${payload.ticketId}` },
       ]],
     },
   });
@@ -256,8 +256,8 @@ export async function restoreTelegramBookingActions(settings: SettingsMap, paylo
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "✅ ยืนยันนัดหมาย", callback_data: `BOOKING_CONFIRM|${payload.ticketId}` },
-          { text: "❌ ยกเลิกคิว", callback_data: `BOOKING_CANCEL|${payload.ticketId}` },
+          { text: settings.TELEGRAM_BOOKING_CONFIRM_TEXT?.trim() || "✅ ยืนยันนัดหมาย", callback_data: `BOOKING_CONFIRM|${payload.ticketId}` },
+          { text: settings.TELEGRAM_BOOKING_CANCEL_TEXT?.trim() || "❌ ยกเลิกคิว", callback_data: `BOOKING_CANCEL|${payload.ticketId}` },
         ],
       ],
     },

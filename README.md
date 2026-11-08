@@ -27,16 +27,23 @@ pnpm dev
 
 จากนั้นเปิด `http://localhost:3000`.
 
+การรัน `supabase/booking-system.sql` กับฐานข้อมูลเดิมจะลบคีย์ตั้งค่าเก่าของ D-pension เพิ่มคีย์ข้อความปุ่มของระบบนัดหมาย และคงค่า Telegram token กับ Chat ID ที่ตั้งไว้แล้ว
+
 ## Telegram: ตั้งค่าบอทและกลุ่มแชต
 
 ระบบใช้ Telegram Bot เดิมที่บันทึกใน Supabase ตาราง `app_settings`:
 
+- `APP_TITLE`: ชื่อระบบ (ระบบนัดหมายออนไลน์)
 - `TELEGRAM_BOT_TOKEN`: token จาก BotFather
 - `TELEGRAM_CHAT_ID_BOOKING_ADMIN`: ฝ่ายบริหารทั่วไป
 - `TELEGRAM_CHAT_ID_BOOKING_ACADEMIC`: กลุ่มงานวิชาการ
 - `TELEGRAM_CHAT_ID_BOOKING_GF`: กลุ่มงานระบบการคลัง GF
 - `TELEGRAM_CHAT_ID_BOOKING_POLICY`: กลุ่มนโยบายเศรษฐกิจการคลัง
 - `TELEGRAM_CHAT_ID`: ห้องสำรองเมื่อยังไม่ได้กำหนดห้องของกลุ่มงานนั้น
+- `TELEGRAM_BOOKING_CONFIRM_TEXT`: ข้อความปุ่มยืนยันนัดหมาย
+- `TELEGRAM_BOOKING_CANCEL_TEXT`: ข้อความปุ่มยกเลิกคิว
+- `TELEGRAM_BOOKING_CANCEL_REASON_TEXT`: ข้อความปุ่มระบุเหตุผลการยกเลิก
+- `TELEGRAM_BOOKING_CANCEL_SKIP_TEXT`: ข้อความปุ่มยกเลิกโดยไม่ระบุเหตุผล
 
 เพิ่มบอทเข้าแต่ละกลุ่ม แล้วกำหนดค่า Chat ID ใน Supabase SQL Editor ตัวอย่าง (แทนค่าตัวอย่างด้วยค่าจริง):
 

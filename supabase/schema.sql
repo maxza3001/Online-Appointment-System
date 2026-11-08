@@ -47,36 +47,18 @@ for each row
 execute procedure public.set_updated_at();
 
 insert into public.app_settings (key, value, description) values
+  ('APP_TITLE', 'ระบบนัดหมายออนไลน์', 'ชื่อระบบนัดหมายออนไลน์'),
   ('TELEGRAM_BOT_TOKEN', '', 'Token จาก BotFather'),
-  ('TELEGRAM_CHAT_ID', '', 'Chat ID ของกลุ่มหรือบุคคล'),
-  ('SEND_FULL_ID', 'FALSE', 'ตั้งเป็น TRUE หากต้องการส่งเลขบัตรเต็มไปใน Telegram'),
-  ('APP_TITLE', 'ระบบบำเหน็จค้ำประกัน', 'ชื่อระบบ'),
-  ('ENABLE_DASHBOARD', 'TRUE', 'เปิดหรือปิดหน้า Dashboard'),
-  ('TG_BTN_RECEIVE_TEXT', '📥 รับเรื่องแล้ว', 'ข้อความปุ่ม Telegram: รับเรื่องแล้ว'),
-  ('TG_BTN_RECEIVE_STATUS', 'รับเรื่องแล้ว', 'ค่าสถานะเมื่อกดปุ่มรับเรื่องแล้ว'),
-  ('TG_BTN_PENDING_TEXT', '⏳ รอพิจารณา', 'ข้อความปุ่ม Telegram: รอพิจารณา'),
-  ('TG_BTN_PENDING_STATUS', 'รอพิจารณา', 'ค่าสถานะเมื่อกดปุ่มรอพิจารณา'),
-  ('TG_BTN_NOT_FOUND_TEXT', '🚫 ยังไม่มีในระบบ d-pension', 'ข้อความปุ่ม Telegram: ยังไม่มีในระบบ d-pension'),
-  ('TG_BTN_NOT_FOUND_STATUS', 'ยังไม่มีในระบบ d-pension', 'ค่าสถานะเมื่อกดปุ่มยังไม่มีในระบบ d-pension'),
-  ('TG_BTN_APPROVE_TEXT', '✅ อนุมัติแล้ว', 'ข้อความปุ่ม Telegram: อนุมัติแล้ว'),
-  ('TG_BTN_APPROVE_STATUS', 'อนุมัติแล้ว', 'ค่าสถานะเมื่อกดปุ่มอนุมัติแล้ว')
-on conflict (key) do nothing;
+  ('TELEGRAM_CHAT_ID', '', 'Chat ID สำรองเมื่อยังไม่ได้กำหนดห้องของกลุ่มงาน'),
+  ('TELEGRAM_BOOKING_CONFIRM_TEXT', '✅ ยืนยันนัดหมาย', 'ข้อความปุ่ม Telegram: ยืนยันนัดหมาย'),
+  ('TELEGRAM_BOOKING_CANCEL_TEXT', '❌ ยกเลิกคิว', 'ข้อความปุ่ม Telegram: ยกเลิกคิว'),
+  ('TELEGRAM_BOOKING_CANCEL_REASON_TEXT', '✍️ ระบุเหตุผล', 'ข้อความปุ่ม Telegram: ระบุเหตุผลการยกเลิก'),
+  ('TELEGRAM_BOOKING_CANCEL_SKIP_TEXT', 'ยกเลิกโดยไม่ระบุเหตุผล', 'ข้อความปุ่ม Telegram: ยกเลิกโดยไม่ระบุเหตุผล')
+on conflict (key) do update set description = excluded.description;
 
 update public.app_settings
-set
-  value = case key
-    when 'TG_BTN_NOT_FOUND_TEXT' then '🚫 ยังไม่มีในระบบ d-pension'
-    when 'TG_BTN_NOT_FOUND_STATUS' then 'ยังไม่มีในระบบ d-pension'
-    else value
-  end,
-  description = case key
-    when 'TG_BTN_NOT_FOUND_TEXT' then 'ข้อความปุ่ม Telegram: ยังไม่มีในระบบ d-pension'
-    when 'TG_BTN_NOT_FOUND_STATUS' then 'ค่าสถานะเมื่อกดปุ่มยังไม่มีในระบบ d-pension'
-    else description
-  end
-where
-  (key = 'TG_BTN_NOT_FOUND_TEXT' and value = '🚫 ยังไม่มีในระบบ')
-  or (key = 'TG_BTN_NOT_FOUND_STATUS' and value = 'ยังไม่มีในระบบ');
+set value = 'ระบบนัดหมายออนไลน์', description = 'ชื่อระบบนัดหมายออนไลน์'
+where key = 'APP_TITLE' and value = 'ระบบบำเหน็จค้ำประกัน';
 
 -- Optional Telegram destinations for appointment notifications, by responsible department.
 insert into public.app_settings (key, value, description) values
@@ -84,4 +66,8 @@ insert into public.app_settings (key, value, description) values
   ('TELEGRAM_CHAT_ID_BOOKING_ACADEMIC', '', 'Telegram chat ID for กลุ่มงานวิชาการ bookings'),
   ('TELEGRAM_CHAT_ID_BOOKING_GF', '', 'Telegram chat ID for กลุ่มงานระบบการคลัง GF bookings'),
   ('TELEGRAM_CHAT_ID_BOOKING_POLICY', '', 'Telegram chat ID for กลุ่มนโยบายเศรษฐกิจการคลัง bookings')
-on conflict (key) do nothing;
+on conflict (key) do update set description = excluded.description;
+
+delete from public.app_settings
+where key in ('ENABLE_DASHBOARD', 'SEND_FULL_ID')
+  or key like 'TG_BTN_%';
