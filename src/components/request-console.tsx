@@ -29,6 +29,7 @@ type BookingStatus = {
   timeSlot: string;
   status: string;
   receiverName: string;
+  note: string;
 };
 
 type CreateBookingResponse = {
@@ -643,6 +644,7 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
                   <div><span>กลุ่มงาน</span><strong>{statusResult.department}</strong></div>
                   <div><span>วันที่เข้าพบ</span><strong>{formatThaiDate(statusResult.date)}</strong></div>
                   <div><span>ช่วงเวลา</span><strong>{statusResult.timeSlot}</strong></div>
+                  <div><span>หมายเหตุเพิ่มเติม</span><strong>{statusResult.note || "-"}</strong></div>
                 </div>
               </div>
             ) : null}

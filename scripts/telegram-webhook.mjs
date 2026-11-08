@@ -116,6 +116,7 @@ async function setWebhook() {
 
   const result = await callTelegram(settings.TELEGRAM_BOT_TOKEN, "setWebhook", {
     url: webhookUrl,
+    allowed_updates: ["message", "callback_query"],
   });
 
   console.log(JSON.stringify({ webhookUrl, result }, null, 2));

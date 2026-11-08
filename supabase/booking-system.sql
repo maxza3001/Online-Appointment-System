@@ -25,10 +25,21 @@ create table if not exists public.bookings (
   topic text not null,
   department text not null,
   receiver_name text not null default '',
+  note text not null default '',
   status text not null default 'รอตอบรับ',
+  pending_cancel_user_id bigint,
+  pending_cancel_chat_id bigint,
+  pending_cancel_message_id bigint,
+  pending_cancel_at timestamptz,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.bookings add column if not exists note text not null default '';
+alter table public.bookings add column if not exists pending_cancel_user_id bigint;
+alter table public.bookings add column if not exists pending_cancel_chat_id bigint;
+alter table public.bookings add column if not exists pending_cancel_message_id bigint;
+alter table public.bookings add column if not exists pending_cancel_at timestamptz;
 
 create unique index if not exists bookings_unique_active_slot
   on public.bookings (appointment_date, department, time_slot)

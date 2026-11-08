@@ -137,6 +137,7 @@ export async function createBooking(input: CreateBookingInput, appOrigin: string
           timeSlot: timeSlot.id,
           status: "รอตอบรับ",
           receiverName: "รอเจ้าหน้าที่ตอบรับ",
+          note: "",
         },
       };
     }
@@ -166,13 +167,9 @@ export async function createBooking(input: CreateBookingInput, appOrigin: string
   throw new AppError("สร้างหมายเลขคิวไม่สำเร็จ กรุณาลองใหม่อีกครั้ง", 500);
 }
 
-export async function updateBookingStatusFromTelegram(
-  settings: Record<string, string>,
-  ticketId: string,
-  action: "BOOKING_CONFIRM" | "BOOKING_CANCEL",
-  callbackChatId: number | string,
-  actorName: string,
-) {
+const CANCELLATION_REPLY_WINDOW_MS = 30 * 60 * 1000;
+
+async function getTelegramBooking(settings: Record<string, string>, ticketId: string, callbackChatId: number | string) {
   const normalizedTicketId = ticketId.trim().toUpperCase();
   if (!/^NID-[A-Z0-9]{6}$/.test(normalizedTicketId)) {
     throw new AppError("รูปแบบหมายเลขคิวไม่ถูกต้อง", 400);
@@ -181,7 +178,7 @@ export async function updateBookingStatusFromTelegram(
   const supabase = getSupabaseAdminClient();
   const { data: booking, error: lookupError } = await supabase
     .from("bookings")
-    .select("ticket_id, department, status")
+    .select("ticket_id, department, status, pending_cancel_user_id, pending_cancel_chat_id, pending_cancel_message_id, pending_cancel_at")
     .eq("ticket_id", normalizedTicketId)
     .maybeSingle();
 
@@ -202,12 +199,28 @@ export async function updateBookingStatusFromTelegram(
     throw new AppError("กลุ่ม Telegram นี้ไม่มีสิทธิ์เปลี่ยนสถานะคิว", 403);
   }
 
-  const nextStatus = action === "BOOKING_CONFIRM" ? "ยืนยันแล้ว" : "ยกเลิก";
+  return { supabase, booking, ticketId: normalizedTicketId };
+}
+
+export async function updateBookingStatusFromTelegram(
+  settings: Record<string, string>,
+  ticketId: string,
+  callbackChatId: number | string,
+  actorName: string,
+) {
+  const { supabase, booking, ticketId: normalizedTicketId } = await getTelegramBooking(settings, ticketId, callbackChatId);
   if (booking.status !== "รอตอบรับ") return { ticketId: normalizedTicketId, status: booking.status, updated: false };
 
   const { data: updatedBooking, error: updateError } = await supabase
     .from("bookings")
-    .update({ status: nextStatus, receiver_name: actorName })
+    .update({
+      status: "ยืนยันแล้ว",
+      receiver_name: actorName,
+      pending_cancel_user_id: null,
+      pending_cancel_chat_id: null,
+      pending_cancel_message_id: null,
+      pending_cancel_at: null,
+    })
     .eq("ticket_id", normalizedTicketId)
     .eq("status", "รอตอบรับ")
     .select("status")
@@ -221,6 +234,144 @@ export async function updateBookingStatusFromTelegram(
   };
 }
 
+export async function beginBookingCancellationFromTelegram(
+  settings: Record<string, string>,
+  ticketId: string,
+  callbackChatId: number | string,
+  callbackUserId: number | string,
+  callbackMessageId: number,
+) {
+  const { supabase, booking, ticketId: normalizedTicketId } = await getTelegramBooking(settings, ticketId, callbackChatId);
+  if (booking.status !== "รอตอบรับ") return { ticketId: normalizedTicketId, status: booking.status, updated: false };
+
+  const { data: updatedBooking, error: updateError } = await supabase
+    .from("bookings")
+    .update({
+      pending_cancel_user_id: callbackUserId,
+      pending_cancel_chat_id: callbackChatId,
+      pending_cancel_message_id: callbackMessageId,
+      pending_cancel_at: new Date().toISOString(),
+    })
+    .eq("ticket_id", normalizedTicketId)
+    .eq("status", "รอตอบรับ")
+    .select("status")
+    .maybeSingle();
+
+  if (updateError) throw new AppError(`เริ่มยกเลิกคิวไม่สำเร็จ: ${updateError.message}`, 500);
+  return {
+    ticketId: normalizedTicketId,
+    status: updatedBooking?.status ?? booking.status,
+    updated: Boolean(updatedBooking),
+  };
+}
+
+export async function prepareBookingCancellationReasonFromTelegram(
+  settings: Record<string, string>,
+  ticketId: string,
+  callbackChatId: number | string,
+  callbackUserId: number | string,
+) {
+  const { supabase, booking, ticketId: normalizedTicketId } = await getTelegramBooking(settings, ticketId, callbackChatId);
+  const originalMessageId = booking.pending_cancel_message_id == null ? null : Number(booking.pending_cancel_message_id);
+  const belongsToPendingCancellation =
+    String(booking.pending_cancel_user_id ?? "") === String(callbackUserId) &&
+    String(booking.pending_cancel_chat_id ?? "") === String(callbackChatId);
+
+  if (booking.status !== "รอตอบรับ" || !belongsToPendingCancellation) {
+    return { ticketId: normalizedTicketId, status: booking.status, authorized: false, expired: false, originalMessageId };
+  }
+
+  const pendingSince = booking.pending_cancel_at ? Date.parse(booking.pending_cancel_at) : 0;
+  if (!pendingSince || Date.now() - pendingSince > CANCELLATION_REPLY_WINDOW_MS) {
+    const { error: clearError } = await supabase
+      .from("bookings")
+      .update({
+        pending_cancel_user_id: null,
+        pending_cancel_chat_id: null,
+        pending_cancel_message_id: null,
+        pending_cancel_at: null,
+      })
+      .eq("ticket_id", normalizedTicketId)
+      .eq("status", "รอตอบรับ")
+      .eq("pending_cancel_user_id", callbackUserId);
+
+    if (clearError) throw new AppError(`ล้างคำขอยกเลิกที่หมดอายุไม่สำเร็จ: ${clearError.message}`, 500);
+    return { ticketId: normalizedTicketId, status: booking.status, authorized: true, expired: true, originalMessageId };
+  }
+
+  return { ticketId: normalizedTicketId, status: booking.status, authorized: true, expired: false, originalMessageId };
+}
+
+export async function completeBookingCancellationFromTelegram(
+  settings: Record<string, string>,
+  ticketId: string,
+  callbackChatId: number | string,
+  callbackUserId: number | string,
+  actorName: string,
+  reason: string,
+) {
+  const { supabase, booking, ticketId: normalizedTicketId } = await getTelegramBooking(settings, ticketId, callbackChatId);
+  const originalMessageId = booking.pending_cancel_message_id == null ? null : Number(booking.pending_cancel_message_id);
+  const belongsToPendingCancellation =
+    String(booking.pending_cancel_user_id ?? "") === String(callbackUserId) &&
+    String(booking.pending_cancel_chat_id ?? "") === String(callbackChatId);
+
+  if (booking.status !== "รอตอบรับ" || !belongsToPendingCancellation) {
+    return { ticketId: normalizedTicketId, status: booking.status, updated: false, authorized: false, expired: false, originalMessageId };
+  }
+
+  const pendingSince = booking.pending_cancel_at ? Date.parse(booking.pending_cancel_at) : 0;
+  if (!pendingSince || Date.now() - pendingSince > CANCELLATION_REPLY_WINDOW_MS) {
+    const { error: clearError } = await supabase
+      .from("bookings")
+      .update({
+        pending_cancel_user_id: null,
+        pending_cancel_chat_id: null,
+        pending_cancel_message_id: null,
+        pending_cancel_at: null,
+      })
+      .eq("ticket_id", normalizedTicketId)
+      .eq("status", "รอตอบรับ")
+      .eq("pending_cancel_user_id", callbackUserId);
+
+    if (clearError) throw new AppError(`ล้างคำขอยกเลิกที่หมดอายุไม่สำเร็จ: ${clearError.message}`, 500);
+    return { ticketId: normalizedTicketId, status: booking.status, updated: false, authorized: true, expired: true, originalMessageId };
+  }
+
+  const cleanReason = reason.trim();
+  if (cleanReason.length > 1000) {
+    throw new AppError("เหตุผลการยกเลิกยาวเกินไป กรุณาระบุไม่เกิน 1,000 ตัวอักษร", 400);
+  }
+
+  const { data: updatedBooking, error: updateError } = await supabase
+    .from("bookings")
+    .update({
+      status: "ยกเลิก",
+      receiver_name: actorName,
+      note: cleanReason,
+      pending_cancel_user_id: null,
+      pending_cancel_chat_id: null,
+      pending_cancel_message_id: null,
+      pending_cancel_at: null,
+    })
+    .eq("ticket_id", normalizedTicketId)
+    .eq("status", "รอตอบรับ")
+    .eq("pending_cancel_user_id", callbackUserId)
+    .eq("pending_cancel_chat_id", callbackChatId)
+    .select("status")
+    .maybeSingle();
+
+  if (updateError) throw new AppError(`ยกเลิกคิวไม่สำเร็จ: ${updateError.message}`, 500);
+  return {
+    ticketId: normalizedTicketId,
+    status: updatedBooking?.status ?? booking.status,
+    updated: Boolean(updatedBooking),
+    authorized: true,
+    expired: false,
+    originalMessageId,
+  };
+}
+
 export async function checkBookingStatus(ticketId: string) {
   const normalizedTicketId = ticketId.trim().toUpperCase();
   if (!/^NID-[A-Z0-9]{6}$/.test(normalizedTicketId)) {
@@ -230,7 +381,7 @@ export async function checkBookingStatus(ticketId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("bookings")
-    .select("ticket_id, agency, topic, department, appointment_date, time_slot, status, receiver_name")
+    .select("ticket_id, agency, topic, department, appointment_date, time_slot, status, receiver_name, note")
     .eq("ticket_id", normalizedTicketId)
     .maybeSingle();
 
@@ -248,5 +399,6 @@ export async function checkBookingStatus(ticketId: string) {
     timeSlot: data.time_slot,
     status: data.status || "รอตอบรับ",
     receiverName: data.receiver_name || "รอเจ้าหน้าที่ตอบรับ",
+    note: data.note || "",
   };
 }

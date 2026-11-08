@@ -167,6 +167,154 @@ export async function sendTelegramBookingCallbackFeedback(settings: SettingsMap,
   ]);
 }
 
+export async function answerTelegramCallbackQuery(settings: SettingsMap, callbackId: string, text: string) {
+  const token = settings.TELEGRAM_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) return;
+
+  await callTelegramApi(token, "answerCallbackQuery", {
+    callback_query_id: callbackId,
+    text,
+  });
+}
+
+export async function sendTelegramBookingCancellationPrompt(settings: SettingsMap, payload: {
+  callbackId: string;
+  chatId: number | string;
+  bookingMessageId: number;
+  ticketId: string;
+}) {
+  const token = settings.TELEGRAM_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) return;
+
+  await callTelegramApi(token, "answerCallbackQuery", {
+    callback_query_id: payload.callbackId,
+    text: "พิมพ์เหตุผลหรือเลือกยกเลิกโดยไม่ระบุเหตุผลได้",
+  });
+
+  const prompt = await callTelegramApi(token, "sendMessage", {
+    chat_id: payload.chatId,
+    text: `✍️ เหตุผลการยกเลิกคิว ${payload.ticketId} (พิมพ์เหตุผลด้านล่างได้เลย)`,
+    reply_to_message_id: payload.bookingMessageId,
+    reply_markup: {
+      force_reply: true,
+      input_field_placeholder: "เหตุผล (ไม่บังคับ)",
+    },
+  });
+  if (!prompt.ok) throw new Error(prompt.description || "ส่งข้อความขอเหตุผลการยกเลิกไม่สำเร็จ");
+
+  const skip = await callTelegramApi(token, "editMessageReplyMarkup", {
+    chat_id: payload.chatId,
+    message_id: payload.bookingMessageId,
+    reply_markup: {
+      inline_keyboard: [[{
+        text: "ยกเลิกโดยไม่ระบุเหตุผล",
+        callback_data: `BOOKING_CANCEL_SKIP|${payload.ticketId}`,
+      }]],
+    },
+  });
+  if (!skip.ok) throw new Error(skip.description || "แสดงตัวเลือกยกเลิกโดยไม่ระบุเหตุผลไม่สำเร็จ");
+}
+
+export async function sendTelegramBookingCancellationOptions(settings: SettingsMap, payload: {
+  callbackId: string;
+  chatId: number | string;
+  bookingMessageId: number;
+  ticketId: string;
+}) {
+  const token = settings.TELEGRAM_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) return;
+
+  await callTelegramApi(token, "answerCallbackQuery", {
+    callback_query_id: payload.callbackId,
+    text: "เลือกได้ว่าจะระบุเหตุผลหรือข้าม",
+  });
+
+  const result = await callTelegramApi(token, "editMessageReplyMarkup", {
+    chat_id: payload.chatId,
+    message_id: payload.bookingMessageId,
+    reply_markup: {
+      inline_keyboard: [[
+        { text: "✍️ ระบุเหตุผล", callback_data: `BOOKING_CANCEL_REASON|${payload.ticketId}` },
+        { text: "ยกเลิกโดยไม่ระบุเหตุผล", callback_data: `BOOKING_CANCEL_SKIP|${payload.ticketId}` },
+      ]],
+    },
+  });
+  if (!result.ok) throw new Error(result.description || "แสดงตัวเลือกการยกเลิกไม่สำเร็จ");
+}
+
+export async function restoreTelegramBookingActions(settings: SettingsMap, payload: {
+  chatId: number | string;
+  messageId: number;
+  ticketId: string;
+}) {
+  const token = settings.TELEGRAM_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) return;
+
+  await callTelegramApi(token, "editMessageReplyMarkup", {
+    chat_id: payload.chatId,
+    message_id: payload.messageId,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ ยืนยันนัดหมาย", callback_data: `BOOKING_CONFIRM|${payload.ticketId}` },
+          { text: "❌ ยกเลิกคิว", callback_data: `BOOKING_CANCEL|${payload.ticketId}` },
+        ],
+      ],
+    },
+  });
+}
+
+export async function sendTelegramBookingCancellationFeedback(settings: SettingsMap, payload: {
+  callbackId?: string;
+  chatId: number | string;
+  sourceMessageId?: number;
+  originalMessageId?: number | null;
+  replyToMessageId?: number;
+  ticketId: string;
+  status: string;
+  actionBy: string;
+  reason: string;
+}) {
+  const token = settings.TELEGRAM_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) return;
+
+  const messagesToClear = [...new Set([payload.sourceMessageId, payload.originalMessageId].filter((id): id is number => typeof id === "number"))];
+  const reasonLine = payload.reason ? `\n📝 หมายเหตุเพิ่มเติม: ${escapeTelegramHtml(payload.reason)}` : "\n📝 หมายเหตุเพิ่มเติม: -";
+
+  await Promise.all([
+    ...(payload.callbackId ? [callTelegramApi(token, "answerCallbackQuery", {
+      callback_query_id: payload.callbackId,
+      text: `อัปเดตสถานะคิวเป็น: ${payload.status}`,
+    })] : []),
+    ...messagesToClear.map((messageId) => callTelegramApi(token, "editMessageReplyMarkup", {
+      chat_id: payload.chatId,
+      message_id: messageId,
+      reply_markup: { inline_keyboard: [] },
+    })),
+    callTelegramApi(token, "sendMessage", {
+      chat_id: payload.chatId,
+      text: `🎫 คิว ${payload.ticketId} อัปเดตสถานะเป็น <b>${escapeTelegramHtml(payload.status)}</b>\n👤 ผู้ดำเนินการ: ${escapeTelegramHtml(payload.actionBy)}${reasonLine}`,
+      parse_mode: "HTML",
+      ...(payload.replyToMessageId ? { reply_to_message_id: payload.replyToMessageId } : {}),
+    }),
+  ]);
+}
+
+export async function sendTelegramBookingCancellationNotice(settings: SettingsMap, payload: {
+  chatId: number | string;
+  replyToMessageId?: number;
+  text: string;
+}) {
+  const token = settings.TELEGRAM_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+  if (!token) return;
+
+  await callTelegramApi(token, "sendMessage", {
+    chat_id: payload.chatId,
+    text: payload.text,
+    ...(payload.replyToMessageId ? { reply_to_message_id: payload.replyToMessageId } : {}),
+  });
+}
+
 export async function sendTelegramStatusNotification(settings: SettingsMap, payload: {
   requestSummary: string;
   status: string;
