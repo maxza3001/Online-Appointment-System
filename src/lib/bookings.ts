@@ -171,6 +171,7 @@ export async function updateBookingStatusFromTelegram(
   ticketId: string,
   action: "BOOKING_CONFIRM" | "BOOKING_CANCEL",
   callbackChatId: number | string,
+  actorName: string,
 ) {
   const normalizedTicketId = ticketId.trim().toUpperCase();
   if (!/^NID-[A-Z0-9]{6}$/.test(normalizedTicketId)) {
@@ -206,7 +207,7 @@ export async function updateBookingStatusFromTelegram(
 
   const { data: updatedBooking, error: updateError } = await supabase
     .from("bookings")
-    .update({ status: nextStatus })
+    .update({ status: nextStatus, receiver_name: actorName })
     .eq("ticket_id", normalizedTicketId)
     .eq("status", "รอตอบรับ")
     .select("status")

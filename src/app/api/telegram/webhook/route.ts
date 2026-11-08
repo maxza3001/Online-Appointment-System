@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       const chatId = callbackQuery.message?.chat?.id;
       if (!messageId || !chatId) return Response.json({ ok: true });
 
-      const result = await updateBookingStatusFromTelegram(settings, recordId, action, chatId);
+      const result = await updateBookingStatusFromTelegram(settings, recordId, action, chatId, actorName);
       await sendTelegramBookingCallbackFeedback(settings, {
         callbackId: callbackQuery.id,
         messageId,
