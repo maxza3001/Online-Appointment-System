@@ -4,6 +4,7 @@ import { randomInt } from "node:crypto";
 
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSettingsMap } from "@/lib/settings";
+import { syncBookingReportRow } from "@/lib/google-sheets";
 import { sendTelegramBookingNotification } from "@/lib/telegram";
 import { BOOKING_TIME_SLOTS, BOOKING_TOPIC_GROUPS, getBookingTopic } from "@/lib/booking-options";
 import type { CreateBookingInput } from "@/lib/types";
@@ -107,6 +108,18 @@ export async function createBooking(input: CreateBookingInput, appOrigin: string
     });
 
     if (!error) {
+      await syncBookingReportRow({
+        receiverName: "",
+        amount: 1,
+        date: input.date,
+        timeSlot: timeSlot.id,
+        agency,
+        topic: topicText,
+        department: topic.department,
+        ticketId,
+        status: "รอตอบรับ",
+      });
+
       try {
         const telegramSettings = await getSettingsMap();
         const notification = await sendTelegramBookingNotification(telegramSettings, {
@@ -169,6 +182,37 @@ export async function createBooking(input: CreateBookingInput, appOrigin: string
 
 const CANCELLATION_REPLY_WINDOW_MS = 30 * 60 * 1000;
 
+async function syncBookingReportByTicket(ticketId: string) {
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("bookings")
+      .select("receiver_name, amount, appointment_date, time_slot, agency, topic, department, ticket_id, status")
+      .eq("ticket_id", ticketId)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.error(`Google Sheets sync skipped for ${ticketId}: could not load updated booking.`);
+      return;
+    }
+
+    await syncBookingReportRow({
+      receiverName: data.receiver_name ?? "",
+      amount: data.amount,
+      date: data.appointment_date,
+      timeSlot: data.time_slot,
+      agency: data.agency,
+      topic: data.topic,
+      department: data.department,
+      ticketId: data.ticket_id,
+      status: data.status,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown Supabase error";
+    console.error(`Google Sheets sync skipped for ${ticketId}: ${message}`);
+  }
+}
+
 async function getTelegramBooking(settings: Record<string, string>, ticketId: string, callbackChatId: number | string) {
   const normalizedTicketId = ticketId.trim().toUpperCase();
   if (!/^NID-[A-Z0-9]{6}$/.test(normalizedTicketId)) {
@@ -227,6 +271,7 @@ export async function updateBookingStatusFromTelegram(
     .maybeSingle();
 
   if (updateError) throw new AppError(`ปรับสถานะคิวไม่สำเร็จ: ${updateError.message}`, 500);
+  if (updatedBooking) await syncBookingReportByTicket(normalizedTicketId);
   return {
     ticketId: normalizedTicketId,
     status: updatedBooking?.status ?? booking.status,
@@ -362,6 +407,7 @@ export async function completeBookingCancellationFromTelegram(
     .maybeSingle();
 
   if (updateError) throw new AppError(`ยกเลิกคิวไม่สำเร็จ: ${updateError.message}`, 500);
+  if (updatedBooking) await syncBookingReportByTicket(normalizedTicketId);
   return {
     ticketId: normalizedTicketId,
     status: updatedBooking?.status ?? booking.status,
