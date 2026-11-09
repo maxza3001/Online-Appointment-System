@@ -108,6 +108,66 @@ function doPost(e) {
 }
 
 // -------------------------------------------------------------
+// แปลงวันที่ (รองรับทั้ง Date object และ String)
+// -------------------------------------------------------------
+function parseDateCell(val) {
+  if (!val) return null;
+
+  // 1. ถ้าเป็น Date object จาก Google Sheets
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null;
+    const year = val.getFullYear();
+    const month = String(val.getMonth() + 1).padStart(2, "0");
+    const day = String(val.getDate()).padStart(2, "0");
+    return { year, month, day, ym: `${year}-${month}`, dateStr: `${year}-${month}-${day}` };
+  }
+
+  // 2. ถ้าเป็น String รูปแบบ YYYY-MM-DD หรือ YYYY/MM/DD
+  const s = String(val).trim();
+  const isoMatch = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1], 10);
+    const month = String(parseInt(isoMatch[2], 10)).padStart(2, "0");
+    const day = String(parseInt(isoMatch[3], 10)).padStart(2, "0");
+    return { year, month, day, ym: `${year}-${month}`, dateStr: `${year}-${month}-${day}` };
+  }
+
+  // 3. ถ้าเป็น String รูปแบบ DD/MM/YYYY
+  const dmyMatch = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    let year = parseInt(dmyMatch[3], 10);
+    if (year > 2400) year -= 543;
+    const month = String(parseInt(dmyMatch[2], 10)).padStart(2, "0");
+    const day = String(parseInt(dmyMatch[1], 10)).padStart(2, "0");
+    return { year, month, day, ym: `${year}-${month}`, dateStr: `${year}-${month}-${day}` };
+  }
+
+  return null;
+}
+
+function getMonthlySheetName(parsedDate) {
+  if (parsedDate && parsedDate.year && parsedDate.month) {
+    const monthNum = parseInt(parsedDate.month, 10);
+    const thaiYear = parsedDate.year > 2400 ? parsedDate.year : parsedDate.year + 543;
+    const monthName = THAI_MONTHS[monthNum - 1] || parsedDate.month;
+    return `สรุป ${monthName} ${thaiYear}`;
+  }
+  return "สรุปยอดรายเดือน";
+}
+
+function formatThaiDisplayDate(dateStr) {
+  const parsed = parseDateCell(dateStr);
+  if (parsed) {
+    const day = parseInt(parsed.day, 10);
+    const monthNum = parseInt(parsed.month, 10);
+    const thaiYear = parsed.year > 2400 ? parsed.year : parsed.year + 543;
+    const monthName = THAI_MONTHS[monthNum - 1] || parsed.month;
+    return `${day} ${monthName} ${thaiYear}`;
+  }
+  return String(dateStr);
+}
+
+// -------------------------------------------------------------
 // จัดการแท็บรายการจองรายวัน (เปลี่ยนชื่อ ชีต1 -> รายการจองรายวัน)
 // -------------------------------------------------------------
 function getOrCreateDailySheet(spreadsheet) {
@@ -140,34 +200,9 @@ function formatDailyHeaders(sheet) {
   const headerRange = sheet.getRange(1, 1, 1, REPORT_HEADERS.length);
   headerRange
     .setFontWeight("bold")
-    .setBackground("#fef08a") // สีเหลืองตามรูปเดิมของผู้ใช้
+    .setBackground("#fef08a") // สีเหลือง
     .setHorizontalAlignment("center");
   sheet.setFrozenRows(1);
-}
-
-// -------------------------------------------------------------
-// แปลงวันที่เป็นชื่อแท็บสรุป เช่น "2026-11-09" -> "สรุป พ.ย. 2569"
-// -------------------------------------------------------------
-function getMonthlySheetName(dateStr) {
-  const parts = String(dateStr).trim().split("-");
-  if (parts.length >= 2) {
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10);
-    if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
-      const thaiYear = year > 2400 ? year : year + 543;
-      const monthName = THAI_MONTHS[month - 1];
-      return `สรุป ${monthName} ${thaiYear}`;
-    }
-  }
-  return "สรุปยอดรายเดือน";
-}
-
-function getYearMonthKey(dateStr) {
-  const parts = String(dateStr).trim().split("-");
-  if (parts.length >= 2) {
-    return `${parts[0]}-${parts[1]}`;
-  }
-  return "";
 }
 
 // -------------------------------------------------------------
@@ -177,12 +212,14 @@ function rebuildAllMonthlySummaries(spreadsheet, dailySheet) {
   const lastRow = dailySheet.getLastRow();
   if (lastRow <= 1) return;
 
-  const dates = dailySheet.getRange(2, 3, lastRow - 1, 1).getDisplayValues();
+  const datesValues = dailySheet.getRange(2, 3, lastRow - 1, 1).getValues();
+  const datesDisplay = dailySheet.getRange(2, 3, lastRow - 1, 1).getDisplayValues();
   const yearMonths = new Set();
-  dates.forEach((row) => {
-    const ym = getYearMonthKey(row[0]);
-    if (ym) yearMonths.add(ym);
-  });
+
+  for (let i = 0; i < datesValues.length; i++) {
+    const parsed = parseDateCell(datesValues[i][0]) || parseDateCell(datesDisplay[i][0]);
+    if (parsed) yearMonths.add(parsed.ym);
+  }
 
   yearMonths.forEach((ym) => {
     updateMonthlySummary(spreadsheet, dailySheet, `${ym}-01`);
@@ -193,20 +230,21 @@ function rebuildAllMonthlySummaries(spreadsheet, dailySheet) {
 // อัปเดตตารางสรุปรายเดือน: มีทั้งแยกกลุ่มงาน และแยกรายวันในเดือน
 // -------------------------------------------------------------
 function updateMonthlySummary(spreadsheet, dailySheet, dateStr) {
-  const targetYm = getYearMonthKey(dateStr);
-  if (!targetYm) return;
+  const targetParsed = parseDateCell(dateStr);
+  if (!targetParsed) return;
+  const targetYm = targetParsed.ym;
 
-  const summarySheetName = getMonthlySheetName(dateStr);
+  const summarySheetName = getMonthlySheetName(targetParsed);
   let summarySheet = spreadsheet.getSheetByName(summarySheetName);
   if (!summarySheet) {
     summarySheet = spreadsheet.insertSheet(summarySheetName);
   }
 
   const lastRow = dailySheet.getLastRow();
-  const rows = lastRow > 1 ? dailySheet.getRange(2, 1, lastRow - 1, REPORT_HEADERS.length).getValues() : [];
+  if (lastRow <= 1) return;
 
-  // กรองเฉพาะข้อมูลของเดือนเป้าหมาย
-  const monthRows = rows.filter((r) => getYearMonthKey(String(r[2])) === targetYm);
+  const rows = dailySheet.getRange(2, 1, lastRow - 1, REPORT_HEADERS.length).getValues();
+  const displayRows = dailySheet.getRange(2, 1, lastRow - 1, REPORT_HEADERS.length).getDisplayValues();
 
   // 1. คำนวณสรุปแยกตามกลุ่มงาน
   const deptStats = {};
@@ -217,37 +255,44 @@ function updateMonthlySummary(spreadsheet, dailySheet, dateStr) {
   // 2. คำนวณสรุปแยกรายวัน
   const dailyStats = {};
 
-  monthRows.forEach((r) => {
-    const date = String(r[2]).trim();
-    const dept = String(r[6]).trim() || "ไม่ระบุ";
-    const status = String(r[8]).trim();
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const disp = displayRows[i];
+
+    // ตรวจวันที่
+    const parsedDate = parseDateCell(r[2]) || parseDateCell(disp[2]);
+    if (!parsedDate || parsedDate.ym !== targetYm) continue;
+
+    const dateKey = parsedDate.dateStr;
+    const dept = String(disp[6] || r[6] || "").trim() || "ไม่ระบุ";
+    const status = String(disp[8] || r[8] || "").trim();
 
     if (!deptStats[dept]) {
       deptStats[dept] = { pending: 0, confirmed: 0, cancelled: 0, total: 0 };
     }
 
-    if (!dailyStats[date]) {
-      dailyStats[date] = { pending: 0, confirmed: 0, cancelled: 0, total: 0 };
+    if (!dailyStats[dateKey]) {
+      dailyStats[dateKey] = { pending: 0, confirmed: 0, cancelled: 0, total: 0, dateObj: parsedDate };
     }
 
     // จัดหมวดหมู่สถานะ
     if (status.includes("รอ") || status === "รอตอบรับ") {
       deptStats[dept].pending++;
-      dailyStats[date].pending++;
+      dailyStats[dateKey].pending++;
     } else if (status.includes("ยืนยัน") || status === "ยืนยันแล้ว") {
       deptStats[dept].confirmed++;
-      dailyStats[date].confirmed++;
+      dailyStats[dateKey].confirmed++;
     } else if (status.includes("ยกเลิก")) {
       deptStats[dept].cancelled++;
-      dailyStats[date].cancelled++;
+      dailyStats[dateKey].cancelled++;
     } else {
       deptStats[dept].pending++;
-      dailyStats[date].pending++;
+      dailyStats[dateKey].pending++;
     }
 
     deptStats[dept].total++;
-    dailyStats[date].total++;
-  });
+    dailyStats[dateKey].total++;
+  }
 
   // ล้างเนื้อหาเดิมเพื่อเขียนใหม่
   summarySheet.clear();
@@ -337,19 +382,6 @@ function updateMonthlySummary(spreadsheet, dailySheet, dateStr) {
   for (let c = 1; c <= 5; c++) {
     summarySheet.autoResizeColumn(c);
   }
-}
-
-function formatThaiDisplayDate(dateStr) {
-  const parts = String(dateStr).trim().split("-");
-  if (parts.length === 3) {
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10);
-    const day = parseInt(parts[2], 10);
-    const thaiYear = year > 2400 ? year : year + 543;
-    const monthName = THAI_MONTHS[month - 1] || parts[1];
-    return `${day} ${monthName} ${thaiYear}`;
-  }
-  return dateStr;
 }
 
 function jsonResponse(value) {
