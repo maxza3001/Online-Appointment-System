@@ -140,7 +140,7 @@ git remote -v
 git add .
 git status
 git diff --cached
-git commit -m "เพิ่มตะแนนความพึงพอใจ"
+git commit -m "เพิ่มชีต"
 git push
 ```
 
