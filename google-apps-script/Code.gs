@@ -251,7 +251,6 @@ function updateMonthlySummary(spreadsheet, dailySheet, dateStr) {
 
   // ล้างเนื้อหาเดิมเพื่อเขียนใหม่
   summarySheet.clear();
-  summarySheet.setGridlines(true);
 
   // --- ส่วนหัวเรื่อง ---
   summarySheet.getRange("A1").setValue(`📊 รายงานสรุปการจองคิวนัดหมายออนไลน์ ประจำเดือน ${summarySheetName.replace("สรุป ", "")}`);
