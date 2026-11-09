@@ -53,6 +53,8 @@ alter table public.bookings add column if not exists pending_cancel_user_id bigi
 alter table public.bookings add column if not exists pending_cancel_chat_id bigint;
 alter table public.bookings add column if not exists pending_cancel_message_id bigint;
 alter table public.bookings add column if not exists pending_cancel_at timestamptz;
+alter table public.bookings
+  add column if not exists satisfaction_rating smallint check (satisfaction_rating between 1 and 5);
 
 create unique index if not exists bookings_unique_active_slot
   on public.bookings (appointment_date, department, time_slot)
@@ -74,3 +76,26 @@ create trigger bookings_set_updated_at
 before update on public.bookings
 for each row
 execute procedure public.set_booking_updated_at();
+
+create or replace function public.get_booking_rating_stats(p_topic text)
+returns jsonb
+language sql
+stable
+as $$
+  select jsonb_build_object(
+    'total', count(satisfaction_rating),
+    'average', coalesce(round(avg(satisfaction_rating::numeric), 2), 0),
+    'counts', jsonb_build_object(
+      '1', count(*) filter (where satisfaction_rating = 1),
+      '2', count(*) filter (where satisfaction_rating = 2),
+      '3', count(*) filter (where satisfaction_rating = 3),
+      '4', count(*) filter (where satisfaction_rating = 4),
+      '5', count(*) filter (where satisfaction_rating = 5)
+    )
+  )
+  from public.bookings
+  where topic = p_topic and satisfaction_rating is not null;
+$$;
+
+revoke all on function public.get_booking_rating_stats(text) from public, anon, authenticated;
+grant execute on function public.get_booking_rating_stats(text) to service_role;

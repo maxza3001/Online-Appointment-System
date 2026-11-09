@@ -15,6 +15,11 @@ export const createBookingSchema = z.object({
   timeSlot: z.string().trim().min(1, "กรุณาเลือกช่วงเวลา"),
 });
 
+export const bookingRatingSchema = z.object({
+  ticketId: z.string().trim().regex(/^NID-[A-Z0-9]{6}$/i, "รูปแบบหมายเลขคิวไม่ถูกต้อง"),
+  rating: z.number().int().min(1, "กรุณาเลือกคะแนน 1–5 ดาว").max(5, "คะแนนสูงสุดคือ 5 ดาว"),
+});
+
 export const updateRequestStatusSchema = z.object({
   status: z.enum(dashboardStatusValues),
   note: z.string().trim().max(500, "หมายเหตุต้องไม่เกิน 500 ตัวอักษร").optional(),

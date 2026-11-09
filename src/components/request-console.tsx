@@ -30,6 +30,14 @@ type BookingStatus = {
   status: string;
   receiverName: string;
   note: string;
+  satisfactionRating?: number | null;
+  ratingStats?: BookingRatingStats;
+};
+
+type BookingRatingStats = {
+  total: number;
+  average: number;
+  counts: Record<"1" | "2" | "3" | "4" | "5", number>;
 };
 
 type CreateBookingResponse = {
@@ -159,6 +167,10 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
   const [statusResult, setStatusResult] = useState<BookingStatus | null>(null);
   const [statusError, setStatusError] = useState("");
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [ratingValue, setRatingValue] = useState(0);
+  const [isSavingRating, setIsSavingRating] = useState(false);
+  const [ratingMessage, setRatingMessage] = useState("");
+  const [ratingError, setRatingError] = useState("");
   const autoLookupTicketRef = useRef("");
 
   const lookupBookingStatus = useCallback(async (rawTicketId: string) => {
@@ -174,10 +186,16 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
     setIsCheckingStatus(true);
     setStatusError("");
     setStatusResult(null);
+    setRatingValue(0);
+    setRatingMessage("");
+    setRatingError("");
     try {
       const response = await fetch(`/api/bookings?ticketId=${encodeURIComponent(ticketId)}`, { cache: "no-store" });
       const result = await readApiResponse<{ found: boolean } & BookingStatus>(response);
-      if (result.found) setStatusResult(result);
+      if (result.found) {
+        setStatusResult(result);
+        setRatingValue(result.satisfactionRating ?? 0);
+      }
       else setStatusError("ไม่พบหมายเลขคิวนี้ในระบบ กรุณาตรวจสอบรหัสอีกครั้ง");
     } catch (error) {
       setStatusError(getFriendlySystemError(error, "ค้นหาสถานะคิวไม่สำเร็จ"));
@@ -185,6 +203,33 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
       setIsCheckingStatus(false);
     }
   }, []);
+
+  async function saveBookingRating() {
+    if (!statusResult || ratingValue < 1 || ratingValue > 5) {
+      setRatingError("กรุณาเลือกคะแนน 1–5 ดาว");
+      return;
+    }
+
+    setIsSavingRating(true);
+    setRatingError("");
+    setRatingMessage("");
+    try {
+      const response = await fetch("/api/bookings/rating", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ticketId: statusResult.ticketId, rating: ratingValue }),
+      });
+      const result = await readApiResponse<{ satisfactionRating: number; ratingStats: BookingRatingStats }>(response);
+      setStatusResult((current) => current
+        ? { ...current, satisfactionRating: result.satisfactionRating, ratingStats: result.ratingStats }
+        : current);
+      setRatingMessage("บันทึกคะแนนเรียบร้อย ขอบคุณสำหรับความคิดเห็น");
+    } catch (error) {
+      setRatingError(getFriendlySystemError(error, "บันทึกคะแนนไม่สำเร็จ กรุณาลองอีกครั้ง"));
+    } finally {
+      setIsSavingRating(false);
+    }
+  }
 
   useEffect(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -610,7 +655,7 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
               <div>
                 <div className="panel-kicker">ตรวจสอบข้อมูลนัดหมาย</div>
                 <h2 className="panel-title">ติดตามสถานะการจองคิว</h2>
-                <p className="panel-subtitle">กรอกหมายเลขคิว (Ticket ID) เพื่อดูสถานะการตอบรับ</p>
+                <p className="panel-subtitle">กรอกหมายเลขคิวเพื่อติดตามสถานะและประเมินความพึงพอใจแยกตามเรื่องที่จอง</p>
               </div>
             </div>
             <form className="ticket-search" onSubmit={handleStatusLookup}>
@@ -646,6 +691,60 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
                   <div><span>ช่วงเวลา</span><strong>{statusResult.timeSlot}</strong></div>
                   <div><span>หมายเหตุเพิ่มเติม</span><strong>{statusResult.note || "-"}</strong></div>
                 </div>
+                {statusResult.status === "ยกเลิก" ? (
+                  <p className="satisfaction-muted">คิวที่ยกเลิกแล้วไม่สามารถให้คะแนนได้</p>
+                ) : (
+                  <section className="satisfaction-panel" aria-labelledby="satisfactionTitle">
+                    <div className="satisfaction-heading">
+                      <h3 id="satisfactionTitle">ให้คะแนนความพึงพอใจ</h3>
+                      <p>ประเมินเรื่อง “{statusResult.topic}” ตั้งแต่ 1–5 ดาว</p>
+                    </div>
+                    <div className="satisfaction-stars" role="group" aria-label="เลือกคะแนนความพึงพอใจ">
+                      {[1, 2, 3, 4, 5].map((stars) => (
+                        <button
+                          key={stars}
+                          type="button"
+                          className={`satisfaction-star ${ratingValue >= stars ? "is-selected" : ""}`}
+                          onClick={() => {
+                            setRatingValue(stars);
+                            setRatingError("");
+                            setRatingMessage("");
+                          }}
+                          aria-label={`${stars} ดาว`}
+                          aria-pressed={ratingValue === stars}
+                        >
+                          ★
+                        </button>
+                      ))}
+                    </div>
+                    <div className="satisfaction-actions">
+                      <span>{ratingValue ? `เลือก ${ratingValue} จาก 5 ดาว` : "แตะดาวเพื่อให้คะแนน"}</span>
+                      <button type="button" className="button-primary" onClick={saveBookingRating} disabled={isSavingRating || ratingValue === 0}>
+                        {isSavingRating ? "กำลังบันทึก…" : statusResult.satisfactionRating ? "ปรับปรุงคะแนน" : "บันทึกคะแนน"}
+                      </button>
+                    </div>
+                    {ratingError ? <p className="satisfaction-feedback is-error" role="alert">{ratingError}</p> : null}
+                    {ratingMessage ? <p className="satisfaction-feedback is-success" role="status">{ratingMessage}</p> : null}
+                    <div className="satisfaction-summary">
+                      <strong>คะแนนเฉลี่ย {statusResult.ratingStats?.average.toFixed(2) ?? "0.00"} / 5</strong>
+                      <span>{statusResult.ratingStats?.total ?? 0} คะแนนในเรื่องนี้</span>
+                    </div>
+                    <div className="satisfaction-distribution" aria-label="การกระจายคะแนนในเรื่องนี้">
+                      {[5, 4, 3, 2, 1].map((stars) => {
+                        const count = statusResult.ratingStats?.counts[String(stars) as keyof BookingRatingStats["counts"]] ?? 0;
+                        const total = statusResult.ratingStats?.total ?? 0;
+                        const percent = total ? (count / total) * 100 : 0;
+                        return (
+                          <div className="satisfaction-distribution-row" key={stars}>
+                            <span>{stars} ★</span>
+                            <div className="satisfaction-meter"><span style={{ width: `${percent}%` }} /></div>
+                            <span>{count}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
               </div>
             ) : null}
           </section>
@@ -672,7 +771,7 @@ export function RequestConsole({ agencies }: { agencies: readonly string[] }) {
           <section className="confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="confirmationTitle">
             <div className="confirmation-check" aria-hidden="true">✓</div>
             <h2 id="confirmationTitle">จองคิวสำเร็จแล้ว</h2>
-            <p className="confirmation-subtitle">บันทึกรหัสคิวหรือสแกน QR Code เพื่อใช้ตรวจสอบสถานะ</p>
+            <p className="confirmation-subtitle">บันทึกรหัสคิวหรือสแกน QR Code เพื่อติดตามสถานะและให้คะแนนความพึงพอใจ</p>
             <div className="confirmation-ticket">
               <span>หมายเลขคิวนัดหมาย (Ticket ID)</span>
               <strong>{confirmation.ticketId}</strong>

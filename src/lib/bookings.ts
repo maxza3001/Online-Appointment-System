@@ -372,6 +372,67 @@ export async function completeBookingCancellationFromTelegram(
   };
 }
 
+type BookingRatingStats = {
+  total: number;
+  average: number;
+  counts: Record<"1" | "2" | "3" | "4" | "5", number>;
+};
+
+async function getBookingRatingStats(topic: string): Promise<BookingRatingStats> {
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("get_booking_rating_stats", { p_topic: topic });
+  if (error) throw new AppError(`โหลดสถิติความพึงพอใจไม่สำเร็จ: ${error.message}`, 500);
+
+  const stats = (data ?? {}) as Partial<BookingRatingStats>;
+  const counts = stats.counts ?? ({} as BookingRatingStats["counts"]);
+  return {
+    total: Number(stats.total) || 0,
+    average: Number(stats.average) || 0,
+    counts: {
+      "1": Number(counts["1"]) || 0,
+      "2": Number(counts["2"]) || 0,
+      "3": Number(counts["3"]) || 0,
+      "4": Number(counts["4"]) || 0,
+      "5": Number(counts["5"]) || 0,
+    },
+  };
+}
+
+export async function submitBookingRating(ticketId: string, rating: number) {
+  const normalizedTicketId = ticketId.trim().toUpperCase();
+  if (!/^NID-[A-Z0-9]{6}$/.test(normalizedTicketId)) {
+    throw new AppError("รูปแบบหมายเลขคิวไม่ถูกต้อง");
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new AppError("กรุณาเลือกคะแนน 1–5 ดาว");
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data: booking, error: lookupError } = await supabase
+    .from("bookings")
+    .select("ticket_id, topic, status")
+    .eq("ticket_id", normalizedTicketId)
+    .maybeSingle();
+
+  if (lookupError) throw new AppError(`ค้นหาคิวเพื่อบันทึกคะแนนไม่สำเร็จ: ${lookupError.message}`, 500);
+  if (!booking) throw new AppError("ไม่พบหมายเลขคิวนี้", 404);
+  if (booking.status === "ยกเลิก") throw new AppError("คิวที่ยกเลิกแล้วไม่สามารถให้คะแนนได้", 409);
+
+  const { data: updatedBooking, error: updateError } = await supabase
+    .from("bookings")
+    .update({ satisfaction_rating: rating })
+    .eq("ticket_id", normalizedTicketId)
+    .select("satisfaction_rating")
+    .single();
+
+  if (updateError) throw new AppError(`บันทึกคะแนนไม่สำเร็จ: ${updateError.message}`, 500);
+
+  return {
+    satisfactionRating: updatedBooking.satisfaction_rating as number,
+    ratingStats: await getBookingRatingStats(booking.topic),
+  };
+}
+
 export async function checkBookingStatus(ticketId: string) {
   const normalizedTicketId = ticketId.trim().toUpperCase();
   if (!/^NID-[A-Z0-9]{6}$/.test(normalizedTicketId)) {
@@ -381,7 +442,7 @@ export async function checkBookingStatus(ticketId: string) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("bookings")
-    .select("ticket_id, agency, topic, department, appointment_date, time_slot, status, receiver_name, note")
+    .select("ticket_id, agency, topic, department, appointment_date, time_slot, status, receiver_name, note, satisfaction_rating")
     .eq("ticket_id", normalizedTicketId)
     .maybeSingle();
 
@@ -389,6 +450,8 @@ export async function checkBookingStatus(ticketId: string) {
     throw new AppError(`ค้นหาสถานะคิวไม่สำเร็จ: ${error.message}`, 500);
   }
   if (!data) return null;
+
+  const ratingStats = await getBookingRatingStats(data.topic);
 
   return {
     ticketId: data.ticket_id,
@@ -400,5 +463,7 @@ export async function checkBookingStatus(ticketId: string) {
     status: data.status || "รอตอบรับ",
     receiverName: data.receiver_name || "รอเจ้าหน้าที่ตอบรับ",
     note: data.note || "",
+    satisfactionRating: data.satisfaction_rating as number | null,
+    ratingStats,
   };
 }
