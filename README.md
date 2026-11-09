@@ -86,11 +86,11 @@ pnpm telegram:webhook:set
 
 1. เปิด Google Sheet แล้วเลือก **ส่วนขยาย > Apps Script**
 2. วางโค้ดจาก `google-apps-script/Code.gs` แล้วบันทึก
-3. ใน Apps Script เปิด **การตั้งค่าโปรเจ็กต์ > Script Properties** และเพิ่ม `GOOGLE_SHEETS_WEBHOOK_SECRET` โดยใช้ค่าเดียวกับใน `.env.local`; หากต้องการใช้แท็บอื่นที่ไม่ใช่แท็บแรก ให้เพิ่ม `REPORT_SHEET_TAB` เป็นชื่อแท็บด้วย
+3. ใน Apps Script เปิด **การตั้งค่าโปรเจ็กต์ > Script Properties** และเพิ่ม `GOOGLE_SHEETS_WEBHOOK_SECRET` โดยใช้ค่าเดียวกับใน `.env.local`; โค้ดระบุแท็บรายงานจาก `gid` ในลิงก์ชีตไว้แล้ว
 4. เลือก **ทำให้ใช้งานได้ > การทำให้ใช้งานได้รายการใหม่ > เว็บแอป** ตั้งให้ทำงานในนามบัญชีเจ้าของสคริปต์ และกำหนดผู้ที่เข้าถึงเป็นทุกคน จากนั้นอนุญาตสิทธิ์และคัดลอก URL ที่ลงท้าย `/exec`
 5. ใส่ URL นั้นใน `GOOGLE_APPS_SCRIPT_URL` และใส่ secret เดียวกันใน `GOOGLE_SHEETS_WEBHOOK_SECRET` ทั้ง `.env.local` และ Vercel แล้ว redeploy
 
-Secret ใช้ป้องกันไม่ให้บุคคลอื่นส่งข้อมูลเข้า endpoint อย่าใส่ในหน้าเว็บ อย่าส่งในแชต และอย่า commit ลง Git ระบบจะใช้แท็บแรกของชีตนี้ และสร้างหัวตาราง 9 คอลัมน์เมื่อแท็บว่าง
+Secret ใช้ป้องกันไม่ให้บุคคลอื่นส่งข้อมูลเข้า endpoint อย่าใส่ในหน้าเว็บ อย่าส่งในแชต และอย่า commit ลง Git ระบบใช้ชีต `1kpweyi5BoNQXBAUkC-YYR4Bpui7MB5jIkkVlm-izBE0` แท็บ `gid=0` และสร้างหัวตาราง 9 คอลัมน์หากแท็บนั้นว่าง
 
 ## คำสั่ง Git ที่ใช้บ่อย
 

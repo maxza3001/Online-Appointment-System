@@ -1,4 +1,5 @@
 const REPORT_SPREADSHEET_ID = "1kpweyi5BoNQXBAUkC-YYR4Bpui7MB5jIkkVlm-izBE0";
+const REPORT_SHEET_GID = 0;
 
 const REPORT_HEADERS = [
   "ชื่อผู้รับเรื่อง",
@@ -34,7 +35,7 @@ function doPost(e) {
 
     const spreadsheet = SpreadsheetApp.openById(REPORT_SPREADSHEET_ID);
     const tabName = scriptProperties.getProperty("REPORT_SHEET_TAB");
-    const sheet = tabName ? spreadsheet.getSheetByName(tabName) : spreadsheet.getSheets()[0];
+    const sheet = tabName ? spreadsheet.getSheetByName(tabName) : spreadsheet.getSheetById(REPORT_SHEET_GID);
     if (!sheet) return jsonResponse({ ok: false, error: "No worksheet tab found" });
 
     let lastRow = sheet.getLastRow();
