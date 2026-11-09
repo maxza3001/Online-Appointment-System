@@ -128,7 +128,7 @@ git remote -v
 git add .
 git status
 git diff --cached
-git commit -m "สถานะผู้รับเรื่อง"
+git commit -m "เพิ่มตะแนนความพึงพอใจ"
 git push
 ```
 
