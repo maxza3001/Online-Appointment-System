@@ -111,6 +111,21 @@ async function syncAllBookings() {
   }
 
   console.log(`\nเสร็จสิ้น: ซิงค์สำเร็จ ${successCount} รายการ, ล้มเหลว ${failCount} รายการ`);
+
+  console.log("กำลังประมวลผลตารางสรุปรายเดือน...");
+  try {
+    const rebuildRes = await fetch(scriptUrl, {
+      method: "POST",
+      headers: { "content-type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "rebuild_all_summaries", secret }),
+    });
+    const rebuildResult = await rebuildRes.json().catch(() => null);
+    if (rebuildResult?.ok) {
+      console.log("สร้าง/อัปเดตแท็บสรุปรายเดือนสำเร็จเรียบร้อย!");
+    }
+  } catch (err) {
+    console.warn("ไม่สามารถเรียก rebuild_all_summaries ได้:", err.message);
+  }
 }
 
 syncAllBookings().catch((err) => {
