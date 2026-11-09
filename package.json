@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "telegram:webhook:info": "node scripts/telegram-webhook.mjs info",
-    "telegram:webhook:set": "node scripts/telegram-webhook.mjs set"
+    "telegram:webhook:set": "node scripts/telegram-webhook.mjs set",
+    "sheets:sync": "node scripts/sync-sheets.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.0",

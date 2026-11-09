@@ -15,7 +15,10 @@ export type BookingReportRow = {
 export async function syncBookingReportRow(booking: BookingReportRow) {
   const endpoint = process.env.GOOGLE_APPS_SCRIPT_URL?.trim();
   const secret = process.env.GOOGLE_SHEETS_WEBHOOK_SECRET?.trim();
-  if (!endpoint || !secret) return { configured: false, synced: false };
+  if (!endpoint || !secret) {
+    console.warn(`[Google Sheets] Skip sync for ${booking.ticketId}: GOOGLE_APPS_SCRIPT_URL or GOOGLE_SHEETS_WEBHOOK_SECRET is not configured in environment variables.`);
+    return { configured: false, synced: false };
+  }
 
   try {
     const response = await fetch(endpoint, {

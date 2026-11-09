@@ -1,4 +1,4 @@
-﻿# ระบบจองคิวนัดหมายออนไลน์
+# ระบบจองคิวนัดหมายออนไลน์
 
 แอป Next.js สำหรับจองคิวและติดตามสถานะ ใช้ Supabase เก็บข้อมูล และส่งแจ้งเตือนผ่าน Telegram Bot โดยเลือกห้องแชตตามกลุ่มงานที่รับผิดชอบ
 
@@ -88,7 +88,12 @@ pnpm telegram:webhook:set
 2. วางโค้ดจาก `google-apps-script/Code.gs` แล้วบันทึก
 3. ใน Apps Script เปิด **การตั้งค่าโปรเจ็กต์ > Script Properties** และเพิ่ม `GOOGLE_SHEETS_WEBHOOK_SECRET` โดยใช้ค่าเดียวกับใน `.env.local`; โค้ดระบุแท็บรายงานจาก `gid` ในลิงก์ชีตไว้แล้ว
 4. เลือก **ทำให้ใช้งานได้ > การทำให้ใช้งานได้รายการใหม่ > เว็บแอป** ตั้งให้ทำงานในนามบัญชีเจ้าของสคริปต์ และกำหนดผู้ที่เข้าถึงเป็นทุกคน จากนั้นอนุญาตสิทธิ์และคัดลอก URL ที่ลงท้าย `/exec`
-5. ใส่ URL นั้นใน `GOOGLE_APPS_SCRIPT_URL` และใส่ secret เดียวกันใน `GOOGLE_SHEETS_WEBHOOK_SECRET` ทั้ง `.env.local` และ Vercel แล้ว redeploy
+5. ใส่ URL นั้นใน `GOOGLE_APPS_SCRIPT_URL` และใส่ secret เดียวกันใน `GOOGLE_SHEETS_WEBHOOK_SECRET` ทั้ง `.env.local` และ Vercel (ใน Project Settings > Environment Variables) แล้วสั่ง Redeploy บน Vercel
+6. หากต้องการซิงค์ข้อมูลการจองย้อนหลังทั้งหมดที่มีใน Supabase เข้า Google Sheet ให้สั่ง:
+
+```bash
+pnpm sheets:sync
+```
 
 Secret ใช้ป้องกันไม่ให้บุคคลอื่นส่งข้อมูลเข้า endpoint อย่าใส่ในหน้าเว็บ อย่าส่งในแชต และอย่า commit ลง Git ระบบใช้ชีต `1kpweyi5BoNQXBAUkC-YYR4Bpui7MB5jIkkVlm-izBE0` แท็บ `gid=0` และสร้างหัวตาราง 9 คอลัมน์หากแท็บนั้นว่าง
 
